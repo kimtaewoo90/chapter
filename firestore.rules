@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── 사용자 데이터 (일기·챕터·Story Arc 등)
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      match /entries/{entryId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /chapters/{chapterId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /story_arcs/{arcId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /story_arc_mappings/{mappingId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /story_arc_meta/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // 위에 없는 하위 컬렉션도 허용
+      match /{subcollection}/{document=**} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // ── 실물 책 주문
+    match /orders/{orderId} {
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'pending_payment'
+        && request.resource.data.snapshots is list
+        && request.resource.data.snapshots.size() > 0;
+
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+
+      allow update, delete: if false;
+    }
+  }
+
+  function isOwner(userId) {
+    return request.auth != null && request.auth.uid == userId;
+  }
+}

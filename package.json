@@ -1,0 +1,21 @@
+{
+  "name": "chapter",
+  "version": "1.0.0",
+  "description": "감성 일기를 기록하고, 시간이 지나 하나의 책으로 완성하는 라이프 아카이브 앱 (Flutter + Firebase MVP).",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "firebase": "^12.15.0"
+  }
+}
