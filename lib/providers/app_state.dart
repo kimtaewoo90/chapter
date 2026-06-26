@@ -15,6 +15,7 @@ import '../core/constants/moods.dart';
 import '../core/config/weather_config.dart';
 import '../models/chapter_moment.dart';
 import '../models/chapter_model.dart';
+import '../core/constants/diary_limits.dart';
 import '../models/daily_entry.dart';
 import '../models/daily_insight.dart';
 import '../models/monthly_review.dart';
@@ -142,6 +143,9 @@ class AppState extends ChangeNotifier {
       _dailyReminder.formatTimeLabel(dailyReminderHour, dailyReminderMinute);
 
   String? get uid => _localUid;
+
+  /// Firestore rules의 request.auth.uid와 일치할 때만 (주문·클라우드 sync)
+  String? get cloudAuthUid => _cloudSyncUid;
 
   bool get isAnonymousAccount => cloudSyncEnabled && _auth.isAnonymous;
 
@@ -696,6 +700,9 @@ class AppState extends ChangeNotifier {
         : List<String>.from(previousLocal);
     if (newPhotoFiles.isNotEmpty) {
       localPaths.addAll(await _entries.savePhotosLocal(newPhotoFiles));
+    }
+    if (localPaths.length > DiaryLimits.maxPhotosPerEntry) {
+      localPaths.removeRange(DiaryLimits.maxPhotosPerEntry, localPaths.length);
     }
 
     onStep?.call(RecordSaveStep.uploadingPhotos);

@@ -2,10 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'book_entry_snapshot.dart';
 
-/// 실물 책 주문 상태
+/// Firestore `orders.status` 값
 enum BookOrderStatus {
   pendingPayment('pending_payment'),
   paid('paid'),
+  pdfReady('pdf_ready'),
+  shipping('shipping'),
+  /// 레거시 — 제작중으로 표시
   processing('processing'),
   printed('printed'),
   shipped('shipped'),
@@ -15,20 +18,41 @@ enum BookOrderStatus {
   final String value;
 
   static BookOrderStatus fromString(String? raw) {
+    if (raw == null || raw.isEmpty) return BookOrderStatus.pendingPayment;
     return BookOrderStatus.values.firstWhere(
       (s) => s.value == raw,
       orElse: () => BookOrderStatus.pendingPayment,
     );
   }
 
-  String get label => switch (this) {
-        BookOrderStatus.pendingPayment => '입금 대기',
-        BookOrderStatus.paid => '입금 확인',
-        BookOrderStatus.processing => '제작 중',
-        BookOrderStatus.printed => '인쇄 완료',
-        BookOrderStatus.shipped => '배송 중',
-        BookOrderStatus.cancelled => '취소됨',
+  /// 앱에 보여줄 단계 (5단계)
+  String get label => switch (displayStep) {
+        0 => '입금 대기',
+        1 => '입금 완료',
+        2 => '제작중',
+        3 => '배송중',
+        4 => '배송완료',
+        _ => '취소됨',
       };
+
+  /// 0~4: 진행 단계, -1: 취소
+  int get displayStep => switch (this) {
+        BookOrderStatus.pendingPayment => 0,
+        BookOrderStatus.paid => 1,
+        BookOrderStatus.pdfReady ||
+        BookOrderStatus.processing ||
+        BookOrderStatus.printed =>
+          2,
+        BookOrderStatus.shipping => 3,
+        BookOrderStatus.shipped => 4,
+        BookOrderStatus.cancelled => -1,
+      };
+
+  /// 내 책 목록에 표시 (배송완료·취소 제외)
+  bool get showInBookList =>
+      this != BookOrderStatus.shipped && this != BookOrderStatus.cancelled;
+
+  bool get isDelivered => this == BookOrderStatus.shipped;
 }
 
 class BookOrder {
@@ -41,6 +65,7 @@ class BookOrder {
     required this.status,
     required this.shippingAddress,
     required this.phoneNumber,
+    required this.recipientName,
     required this.snapshots,
     this.createdAt,
     this.cover,
@@ -57,6 +82,7 @@ class BookOrder {
   final BookOrderStatus status;
   final String shippingAddress;
   final String phoneNumber;
+  final String recipientName;
   final List<BookEntrySnapshot> snapshots;
   final DateTime? createdAt;
   final String? cover;
@@ -66,6 +92,9 @@ class BookOrder {
 
   int get pageCount => snapshots.length;
 
+  /// Firestore에 저장된 status 문자열
+  String get statusValue => status.value;
+
   Map<String, dynamic> toFirestoreCreateMap() => {
         'userId': userId,
         'bookId': bookId,
@@ -73,6 +102,7 @@ class BookOrder {
         'amount': amount,
         'status': status.value,
         'shippingAddress': shippingAddress,
+        'recipientName': recipientName,
         '전화번호': phoneNumber,
         'snapshots': snapshots.map((s) => s.toFirestoreMap()).toList(),
         'cover': cover,
@@ -99,6 +129,7 @@ class BookOrder {
       status: BookOrderStatus.fromString(d['status'] as String?),
       shippingAddress: d['shippingAddress'] as String? ?? '',
       phoneNumber: (d['전화번호'] ?? d['phoneNumber'])?.toString() ?? '',
+      recipientName: (d['recipientName'] ?? d['receiverName'])?.toString() ?? '',
       snapshots: snapshots,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
       cover: d['cover'] as String?,
@@ -108,7 +139,6 @@ class BookOrder {
     );
   }
 
-  /// 예전 테스트 문서 — snapshot 단일 맵 호환
   static List<BookEntrySnapshot> _legacySingleSnapshot(Map<String, dynamic> d) {
     final single = d['snapshot'];
     if (single is! Map) return const [];

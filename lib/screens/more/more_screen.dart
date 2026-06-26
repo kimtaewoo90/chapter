@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/analytics/analytics_route.dart';
 import '../../core/constants/app_fonts.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/app_state.dart';
+import '../../services/analytics_service.dart';
 import '../../widgets/chapter_bottom_bar.dart';
 import '../../widgets/paper_background.dart';
 import '../book/book_screen.dart';
@@ -54,7 +56,8 @@ class MoreScreen extends StatelessWidget {
                   : '${state.allChapters.length}개의 이야기',
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(
+                analyticsPageRoute(
+                  name: 'chapters',
                   builder: (_) => ChaptersScreen(onGoToRecord: () => Navigator.pop(context)),
                 ),
               ),
@@ -65,7 +68,10 @@ class MoreScreen extends StatelessWidget {
               subtitle: '한 해를 책으로 · ${(state.bookProgress * 100).round()}%',
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const BookScreen()),
+                analyticsPageRoute(
+                  name: 'book',
+                  builder: (_) => const BookScreen(),
+                ),
               ),
             ),
             const SizedBox(height: 28),
@@ -79,7 +85,10 @@ class MoreScreen extends StatelessWidget {
                   : '주제·감정·성장 포인트',
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const MonthlyReviewScreen()),
+                analyticsPageRoute(
+                  name: 'monthly_review',
+                  builder: (_) => const MonthlyReviewScreen(),
+                ),
               ),
             ),
             const SizedBox(height: 28),
@@ -95,7 +104,10 @@ class MoreScreen extends StatelessWidget {
                       : 'Firebase 로그인 확인 필요',
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const AccountLinkScreen()),
+                analyticsPageRoute(
+                  name: 'account_link',
+                  builder: (_) => const AccountLinkScreen(),
+                ),
               ),
             ),
             const SizedBox(height: 28),
@@ -105,7 +117,13 @@ class MoreScreen extends StatelessWidget {
               icon: Icons.auto_awesome_outlined,
               title: 'Gemini',
               subtitle: state.geminiStatusMessage ?? '키 미설정 · 로컬 규칙만 사용',
-              onTap: () => context.read<AppState>().checkGeminiConnection(),
+              onTap: () async {
+                await context.read<AppState>().checkGeminiConnection();
+                if (!context.mounted) return;
+                context.read<AnalyticsService>().logGeminiCheck(
+                      connected: context.read<AppState>().geminiConnected,
+                    );
+              },
             ),
             const SizedBox(height: 28),
             _SectionLabel('설정'),
@@ -117,7 +135,10 @@ class MoreScreen extends StatelessWidget {
                   '앱 ${appFontOption(state.fontId).label} · 일기 ${appFontOption(state.diaryFontId).label}',
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const FontSettingsScreen()),
+                analyticsPageRoute(
+                  name: 'font_settings',
+                  builder: (_) => const FontSettingsScreen(),
+                ),
               ),
             ),
             _MoreTile(
@@ -128,7 +149,8 @@ class MoreScreen extends StatelessWidget {
                   : '꺼짐',
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(
+                analyticsPageRoute(
+                  name: 'notification_settings',
                   builder: (_) => const NotificationSettingsScreen(),
                 ),
               ),

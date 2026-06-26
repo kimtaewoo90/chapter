@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/analytics/analytics_route.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/chapter_cover.dart';
 import '../../models/chapter_model.dart';
@@ -76,7 +77,10 @@ class ChaptersScreen extends StatelessWidget {
   static void _openDetail(BuildContext context, ChapterModel chapter) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => ChapterDetailScreen(chapter: chapter)),
+      analyticsPageRoute(
+        name: 'chapter_detail',
+        builder: (_) => ChapterDetailScreen(chapter: chapter),
+      ),
     );
   }
 }

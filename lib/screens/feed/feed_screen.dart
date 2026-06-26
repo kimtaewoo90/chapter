@@ -7,6 +7,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/entry_diary_ai.dart';
 import '../../models/daily_entry.dart';
 import '../../providers/app_state.dart';
+import '../../services/analytics_service.dart';
 import '../../widgets/chapter_bottom_bar.dart';
 import '../../widgets/chapter_whisper_banner.dart';
 import '../../widgets/journal_book_page.dart';
@@ -32,6 +33,7 @@ class _FeedScreenState extends State<FeedScreen> {
   String? _whisperMarkedId;
   late PageController _pageController;
   int _currentPage = 0;
+  bool _didAlignToToday = false;
 
   bool get _embedded => !widget.showHeader;
 
@@ -61,6 +63,7 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    // 최신순(0=오늘). 왼쪽 스와이프 → 과거
     final entries = state.allEntries;
     final textTheme = Theme.of(context).textTheme;
     final today = state.todayEntry;
@@ -76,6 +79,17 @@ class _FeedScreenState extends State<FeedScreen> {
         if (current?.arcId == whisper.arcId) {
           context.read<AppState>().markChapterWhisperSeen();
         }
+      });
+    }
+
+    if (entries.isNotEmpty && !_didAlignToToday) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _didAlignToToday || !_pageController.hasClients) return;
+        _pageController.jumpToPage(0);
+        setState(() {
+          _currentPage = 0;
+          _didAlignToToday = true;
+        });
       });
     }
 
@@ -121,7 +135,7 @@ class _FeedScreenState extends State<FeedScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          '← → 날짜 · ↑↓ 글 읽기',
+                          '← 과거 · → 최근 · ↑↓ 글 읽기',
                           style: textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted),
                         ),
                       ),
@@ -178,7 +192,10 @@ class _FeedScreenState extends State<FeedScreen> {
                                   pageNumber: entries.length - index,
                                   totalPages: entries.length,
                                   scrollable: _embedded,
-                                  onTap: () => showEntryDaySheet(context, entry),
+                                  onTap: () {
+                                    context.read<AnalyticsService>().logDiaryOpen(source: 'spread');
+                                    showEntryDaySheet(context, entry);
+                                  },
                                 ),
                               ),
                             );
@@ -193,7 +210,7 @@ class _FeedScreenState extends State<FeedScreen> {
                     top: 4,
                   ),
                   child: Text(
-                    '← → 페이지 넘기기',
+                    '← 과거 · → 최근',
                     textAlign: TextAlign.center,
                     style: textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted),
                   ),

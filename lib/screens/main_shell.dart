@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/analytics/analytics_route.dart';
 import '../core/theme/app_theme.dart';
 import '../providers/app_state.dart';
+import '../services/analytics_service.dart';
 import '../widgets/chapter_bottom_bar.dart';
 import '../widgets/chapter_reveal_overlay.dart';
 import 'chapters/chapter_detail_screen.dart';
@@ -18,7 +20,7 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  /// 0 홈(캘린더/크게보기) · 1 기록 · 2 더보기
+  /// 0 홈(캘린더/펼쳐보기) · 1 기록 · 2 더보기
   int _index = 0;
   DateTime _recordDate = DateTime.now();
 
@@ -41,6 +43,7 @@ class _MainShellState extends State<MainShell> {
       _recordDate = DateTime(date.year, date.month, date.day);
       _index = 1;
     });
+    context.read<AnalyticsService>().logTabSelect('record');
     context.read<AppState>().refreshTodayWeatherIfNeeded(
           force: context.read<AppState>().isToday(_recordDate),
         );
@@ -49,6 +52,11 @@ class _MainShellState extends State<MainShell> {
   void _goToRecordToday() => _goToRecordForDate(DateTime.now());
 
   void _selectTab(int i) {
+    if (_index != i) {
+      const tabs = ['home', 'record', 'more'];
+      context.read<AnalyticsService>().logTabSelect(tabs[i]);
+      context.read<AnalyticsService>().logScreenView(screenName: tabs[i]);
+    }
     setState(() => _index = i);
     if (i == 0 || i == 1) {
       context.read<AppState>().refreshTodayWeatherIfNeeded();
@@ -58,10 +66,15 @@ class _MainShellState extends State<MainShell> {
   void _onViewRevealedChapter() {
     final state = context.read<AppState>();
     final chapter = state.pendingChapterReveal?.chapter;
+    final arcId = state.pendingChapterReveal?.storyArcId;
+    context.read<AnalyticsService>().logChapterReveal(action: 'view', arcId: arcId);
     state.clearChapterReveal();
     if (chapter != null && mounted) {
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => ChapterDetailScreen(chapter: chapter)),
+        analyticsPageRoute(
+          name: 'chapter_detail',
+          builder: (_) => ChapterDetailScreen(chapter: chapter),
+        ),
       );
     }
   }
@@ -72,6 +85,8 @@ class _MainShellState extends State<MainShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<AppState>().refreshTodayWeatherIfNeeded();
+        context.read<AnalyticsService>().logTabSelect('home');
+        context.read<AnalyticsService>().logScreenView(screenName: 'home');
       }
     });
   }
@@ -106,7 +121,11 @@ class _MainShellState extends State<MainShell> {
             Positioned.fill(
               child: ChapterRevealOverlay(
                 payload: reveal,
-                onDismiss: () => context.read<AppState>().clearChapterReveal(),
+                onDismiss: () {
+                  final arcId = reveal.storyArcId;
+                  context.read<AnalyticsService>().logChapterReveal(action: 'dismiss', arcId: arcId);
+                  context.read<AppState>().clearChapterReveal();
+                },
                 onViewChapter: _onViewRevealedChapter,
               ),
             ),

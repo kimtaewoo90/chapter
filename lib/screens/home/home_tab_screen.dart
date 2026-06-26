@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../services/analytics_service.dart';
 import '../feed/feed_screen.dart';
 import 'calendar_screen.dart';
 
 enum HomeViewMode { calendar, bookSpread }
 
-/// 메인 탭 — 캘린더(기본) ↔ 크게 보기(나의 책) 전환
+/// 메인 탭 — 캘린더(기본) ↔ 펼쳐보기(나의 책) 전환
 class HomeTabScreen extends StatefulWidget {
   const HomeTabScreen({
     super.key,
@@ -42,6 +44,9 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
 
   Future<void> _setMode(HomeViewMode mode) async {
     setState(() => _mode = mode);
+    context.read<AnalyticsService>().logHomeViewMode(
+          mode == HomeViewMode.bookSpread ? 'spread' : 'calendar',
+        );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       'home_view_mode',
@@ -76,7 +81,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                     onDateSelected: (date, _) => widget.onGoToRecordForDate(date),
                   )
                 : FeedScreen(
-                    key: const ValueKey('book'),
+                    key: const ValueKey('book-spread-v2'),
                     onGoToRecord: widget.onGoToRecord,
                     showHeader: false,
                   ),
@@ -119,7 +124,7 @@ class _ViewModeToggle extends StatelessWidget {
                 onTap: () => onChanged(HomeViewMode.calendar),
               ),
               _ModeChip(
-                label: '크게 보기',
+                label: '펼쳐보기',
                 icon: Icons.auto_stories_outlined,
                 selected: mode == HomeViewMode.bookSpread,
                 onTap: () => onChanged(HomeViewMode.bookSpread),

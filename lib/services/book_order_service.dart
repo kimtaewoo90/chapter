@@ -39,6 +39,7 @@ class BookOrderService {
     required String bookTitle,
     required String shippingAddress,
     required String phoneNumber,
+    required String recipientName,
     required bool hardcover,
     String? cover,
     String? style,
@@ -51,6 +52,9 @@ class BookOrderService {
     }
     if (phoneNumber.trim().isEmpty) {
       throw BookOrderException('연락처를 입력해 주세요.');
+    }
+    if (recipientName.trim().isEmpty) {
+      throw BookOrderException('받는 분 이름을 입력해 주세요.');
     }
 
     final snapshots = buildSnapshots(entries);
@@ -67,6 +71,7 @@ class BookOrderService {
       status: BookOrderStatus.pendingPayment,
       shippingAddress: shippingAddress.trim(),
       phoneNumber: phoneNumber.trim(),
+      recipientName: recipientName.trim(),
       snapshots: snapshots,
       cover: cover,
       style: style,
@@ -78,9 +83,9 @@ class BookOrderService {
     return BookOrder.fromDoc(saved);
   }
 
-  Stream<List<BookOrder>> watchOrdersForUser(String userId) {
+  Stream<List<BookOrder>> watchOrdersForUser(String authUid) {
     return _orders
-        .where('userId', isEqualTo: userId)
+        .where('userId', isEqualTo: authUid)
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snap) => snap.docs.map(BookOrder.fromDoc).toList());

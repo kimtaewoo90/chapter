@@ -7,6 +7,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../core/constants/dev_flags.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/app_state.dart';
+import '../../services/analytics_service.dart';
 import '../../services/google_sign_in_helper.dart';
 import '../../widgets/paper_background.dart';
 
@@ -194,6 +195,7 @@ class _AccountLinkScreenState extends State<AccountLinkScreen> {
                             final err =
                                 await context.read<AppState>().linkGoogleAccount();
                             if (err != null) return (error: err, success: null);
+                            context.read<AnalyticsService>().logAccountLink('google');
                             return (
                               error: null,
                               success: '계정이 연결됐어요. 기록을 클라우드에 백업했어요.',
@@ -214,6 +216,7 @@ class _AccountLinkScreenState extends State<AccountLinkScreen> {
                               final err =
                                   await context.read<AppState>().linkAppleAccount();
                               if (err != null) return (error: err, success: null);
+                              context.read<AnalyticsService>().logAccountLink('apple');
                               return (
                                 error: null,
                                 success: 'Apple 계정이 연결됐어요. 기록을 클라우드에 백업했어요.',
@@ -256,6 +259,10 @@ class _AccountLinkScreenState extends State<AccountLinkScreen> {
                           if (result.error != null) {
                             return (error: result.error, success: null);
                           }
+                          context.read<AnalyticsService>().logAccountRestore(
+                                provider: 'google',
+                                importedCount: result.count,
+                              );
                           if (result.count == 0) {
                             return (
                               error: '클라우드에 저장된 기록이 없어요. '
@@ -289,6 +296,10 @@ class _AccountLinkScreenState extends State<AccountLinkScreen> {
                             if (result.error != null) {
                               return (error: result.error, success: null);
                             }
+                            context.read<AnalyticsService>().logAccountRestore(
+                                  provider: 'apple',
+                                  importedCount: result.count,
+                                );
                             if (result.count == 0) {
                               return (
                                 error: '클라우드에 저장된 기록이 없어요. '

@@ -4,7 +4,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 
 const PROJECT_ID = 'chapter-cc187-test';
 const rules = readFileSync('firestore.rules', 'utf8');
@@ -76,9 +76,28 @@ async function run() {
         userId: ownerUid,
         status: 'pending_payment',
         snapshots: [{ date: '2024-01-01', title: 't', body: 'b', photoUrls: [] }],
+        createdAt: new Date('2024-06-01'),
       });
     });
     await expectOk('owner can read own order', () => getDoc(doc(ownerDb, 'orders/order1')));
+    await expectOk('owner orders list query (userId + createdAt)', () =>
+      getDocs(
+        query(
+          collection(ownerDb, 'orders'),
+          where('userId', '==', ownerUid),
+          orderBy('createdAt', 'desc'),
+        ),
+      ),
+    );
+    await expectDenied('query with wrong userId denied', () =>
+      getDocs(
+        query(
+          collection(ownerDb, 'orders'),
+          where('userId', '==', otherUid),
+          orderBy('createdAt', 'desc'),
+        ),
+      ),
+    );
     await expectDenied('other cannot read order', () => getDoc(doc(otherDb, 'orders/order1')));
 
     if (!process.exitCode) {

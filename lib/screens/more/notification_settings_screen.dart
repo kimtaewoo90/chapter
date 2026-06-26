@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/daily_reminder_defaults.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/app_state.dart';
+import '../../services/analytics_service.dart';
 import '../../widgets/paper_background.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
@@ -53,6 +54,12 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(err)),
       );
+    } else {
+      context.read<AnalyticsService>().logNotificationSettings(
+            enabled: appState.dailyReminderEnabled,
+            hour: picked.hour,
+            minute: picked.minute,
+          );
     }
   }
 
@@ -129,6 +136,13 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text(err)),
                           );
+                        } else {
+                          final appState = context.read<AppState>();
+                          context.read<AnalyticsService>().logNotificationSettings(
+                                enabled: appState.dailyReminderEnabled,
+                                hour: appState.dailyReminderHour,
+                                minute: appState.dailyReminderMinute,
+                              );
                         }
                       },
               ),

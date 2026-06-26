@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/entry_photos.dart';
 import '../../models/daily_entry.dart';
 import '../../providers/app_state.dart';
+import '../../services/analytics_service.dart';
 import '../../widgets/entry_photo.dart';
 import '../../widgets/paper_background.dart';
 import '../feed/entry_day_sheet.dart';
@@ -27,7 +28,47 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
+  static const _pageAnchor = 100000;
+
+  late final DateTime _anchorMonth;
+  late final PageController _monthPageController;
   DateTime _focused = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _anchorMonth = DateTime(now.year, now.month);
+    _focused = _anchorMonth;
+    _monthPageController = PageController(initialPage: _pageAnchor);
+  }
+
+  @override
+  void dispose() {
+    _monthPageController.dispose();
+    super.dispose();
+  }
+
+  DateTime _monthForPage(int page) {
+    final offset = page - _pageAnchor;
+    return DateTime(_anchorMonth.year, _anchorMonth.month + offset);
+  }
+
+  void _goToPreviousMonth() {
+    if (!_monthPageController.hasClients) return;
+    _monthPageController.previousPage(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void _goToNextMonth() {
+    if (!_monthPageController.hasClients) return;
+    _monthPageController.nextPage(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
 
   void _handleDayTap(DateTime date, DailyEntry? entry) {
     if (widget.onDateSelected != null) {
@@ -51,33 +92,125 @@ class _CalendarScreenState extends State<CalendarScreen> {
       byDay[e.dateKey] = e;
     }
 
-    final first = DateTime(_focused.year, _focused.month, 1);
-    final daysInMonth = DateTime(_focused.year, _focused.month + 1, 0).day;
-    final startWeekday = first.weekday % 7;
     final today = DateTime.now();
     final monthLabel = DateFormat('yyyy년 M월', 'ko_KR').format(_focused);
-    final daysInMonthWithEntry = List.generate(daysInMonth, (i) {
-      final day = i + 1;
-      final key =
-          '${_focused.year}-${_focused.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
-      return byDay.containsKey(key);
-    }).where((v) => v).length;
+    final compact = widget.embedded;
 
-    final bottomPad = widget.embedded ? ChapterBottomBar.listBottomPadding(context) : 16.0;
+    final monthPager = PageView.builder(
+      controller: _monthPageController,
+      onPageChanged: (page) {
+        final month = _monthForPage(page);
+        setState(() => _focused = month);
+        context.read<AnalyticsService>().logCalendarMonthChange(
+              year: month.year,
+              month: month.month,
+            );
+      },
+      itemBuilder: (context, page) {
+        final month = _monthForPage(page);
+        return _CalendarMonthBody(
+          focused: month,
+          byDay: byDay,
+          today: today,
+          compact: compact,
+          embedded: widget.embedded,
+              onDayTap: (date, entry) {
+                if (entry != null) {
+                  context.read<AnalyticsService>().logDiaryOpen(source: 'calendar');
+                }
+                if (widget.onDateSelected != null && entry == null) {
+              widget.onDateSelected!(date, null);
+            } else if (widget.onDateSelected != null && entry != null) {
+              showEntryDaySheet(
+                context,
+                entry,
+                onEdit: () {
+                  Navigator.pop(context);
+                  widget.onDateSelected!(date, entry);
+                },
+              );
+            } else {
+              _handleDayTap(date, entry);
+            }
+          },
+        );
+      },
+    );
 
-    final body = Padding(
-      padding: EdgeInsets.fromLTRB(12, 0, 12, bottomPad),
+    if (widget.embedded) {
+      return PaperBackground(
+        child: Padding(
+          padding: EdgeInsets.only(bottom: ChapterBottomBar.spreadBottomInset(context)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _MonthHeader(
+                monthLabel: monthLabel,
+                onPrevious: _goToPreviousMonth,
+                onNext: _goToNextMonth,
+              ),
+              const SizedBox(height: 4),
+              Expanded(child: monthPager),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return PaperBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: Text(monthLabel),
+          leading: IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: _goToPreviousMonth,
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.chevron_right),
+              onPressed: _goToNextMonth,
+            ),
+          ],
+        ),
+        body: monthPager,
+      ),
+    );
+  }
+}
+
+class _CalendarMonthBody extends StatelessWidget {
+  const _CalendarMonthBody({
+    required this.focused,
+    required this.byDay,
+    required this.today,
+    required this.compact,
+    required this.embedded,
+    required this.onDayTap,
+  });
+
+  final DateTime focused;
+  final Map<String, DailyEntry> byDay;
+  final DateTime today;
+  final bool compact;
+  final bool embedded;
+  final void Function(DateTime date, DailyEntry? entry) onDayTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final first = DateTime(focused.year, focused.month, 1);
+    final daysInMonth = DateTime(focused.year, focused.month + 1, 0).day;
+    final startWeekday = first.weekday % 7;
+    final rowCount = (startWeekday + daysInMonth + 6) ~/ 7;
+    final bottomPad = embedded ? 0.0 : 16.0;
+    final topPad = compact ? 16.0 : 8.0;
+    final gridGap = compact ? 4.0 : 6.0;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(compact ? 8 : 12, topPad, compact ? 8 : 12, bottomPad),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            daysInMonthWithEntry > 0
-                ? '이번 달 $daysInMonthWithEntry일 기록 · 탭해서 보거나 쓰기'
-                : '날짜를 탭해 첫 기록을 남겨 보세요',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
-          ),
-          const SizedBox(height: 12),
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -90,116 +223,89 @@ class _CalendarScreenState extends State<CalendarScreen> {
               _WeekdayLabel('토'),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: compact ? 10 : 8),
           Expanded(
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 7,
-                mainAxisSpacing: 6,
-                crossAxisSpacing: 6,
-                childAspectRatio: 0.72,
-              ),
-              itemCount: startWeekday + daysInMonth,
-              itemBuilder: (context, i) {
-                if (i < startWeekday) return const SizedBox.shrink();
+            child: _CalendarDayGrid(
+              rowCount: rowCount,
+              startWeekday: startWeekday,
+              daysInMonth: daysInMonth,
+              focused: focused,
+              byDay: byDay,
+              today: today,
+              gap: gridGap,
+              onDayTap: onDayTap,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalendarDayGrid extends StatelessWidget {
+  const _CalendarDayGrid({
+    required this.rowCount,
+    required this.startWeekday,
+    required this.daysInMonth,
+    required this.focused,
+    required this.byDay,
+    required this.today,
+    required this.gap,
+    required this.onDayTap,
+  });
+
+  final int rowCount;
+  final int startWeekday;
+  final int daysInMonth;
+  final DateTime focused;
+  final Map<String, DailyEntry> byDay;
+  final DateTime today;
+  final double gap;
+  final void Function(DateTime date, DailyEntry? entry) onDayTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(rowCount, (row) {
+        return Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: List.generate(7, (col) {
+              final i = row * 7 + col;
+              Widget cell;
+              if (i < startWeekday || i >= startWeekday + daysInMonth) {
+                cell = const SizedBox.shrink();
+              } else {
                 final day = i - startWeekday + 1;
-                final date = DateTime(_focused.year, _focused.month, day);
-                final key = date.year == _focused.year &&
-                        date.month == _focused.month &&
-                        date.day == day
-                    ? '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}'
-                    : '';
+                final date = DateTime(focused.year, focused.month, day);
+                final key =
+                    '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
                 final entry = byDay[key];
                 final isToday = date.year == today.year &&
                     date.month == today.month &&
                     date.day == today.day;
                 final isFuture = date.isAfter(DateTime(today.year, today.month, today.day));
-                return _DayCell(
+                cell = _DayCell(
                   day: day,
                   entry: entry,
                   isToday: isToday,
                   isFuture: isFuture,
-                  onTap: isFuture
-                      ? null
-                      : () {
-                          if (widget.onDateSelected != null && entry == null) {
-                            widget.onDateSelected!(date, null);
-                          } else if (widget.onDateSelected != null && entry != null) {
-                            showEntryDaySheet(
-                              context,
-                              entry,
-                              onEdit: () {
-                                Navigator.pop(context);
-                                widget.onDateSelected!(date, entry);
-                              },
-                            );
-                          } else {
-                            _handleDayTap(date, entry);
-                          }
-                        },
+                  onTap: isFuture ? null : () => onDayTap(date, entry),
                 );
-              },
-            ),
+              }
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    right: col < 6 ? gap : 0,
+                    bottom: row < rowCount - 1 ? gap : 0,
+                  ),
+                  child: cell,
+                ),
+              );
+            }),
           ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _LegendDot(color: AppTheme.accent.withValues(alpha: 0.5)),
-              const SizedBox(width: 6),
-              Text('기록', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted)),
-              const SizedBox(width: 16),
-              const Icon(Icons.photo_outlined, size: 14, color: AppTheme.inkMuted),
-              const SizedBox(width: 4),
-              Text('사진', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted)),
-              const SizedBox(width: 16),
-              const Text('😌', style: TextStyle(fontSize: 14)),
-              const SizedBox(width: 4),
-              Text('무드', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted)),
-            ],
-          ),
-        ],
-      ),
-    );
-
-    if (widget.embedded) {
-      return PaperBackground(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _MonthHeader(
-              monthLabel: monthLabel,
-              onPrevious: () => setState(
-                () => _focused = DateTime(_focused.year, _focused.month - 1),
-              ),
-              onNext: () => setState(
-                () => _focused = DateTime(_focused.year, _focused.month + 1),
-              ),
-            ),
-            Expanded(child: body),
-          ],
-        ),
-      );
-    }
-
-    return PaperBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text(monthLabel),
-          leading: IconButton(
-            icon: const Icon(Icons.chevron_left),
-            onPressed: () => setState(() => _focused = DateTime(_focused.year, _focused.month - 1)),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.chevron_right),
-              onPressed: () => setState(() => _focused = DateTime(_focused.year, _focused.month + 1)),
-            ),
-          ],
-        ),
-        body: body,
-      ),
+        );
+      }),
     );
   }
 }
@@ -257,17 +363,6 @@ class _WeekdayLabel extends StatelessWidget {
         style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted),
       ),
     );
-  }
-}
-
-class _LegendDot extends StatelessWidget {
-  const _LegendDot({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle));
   }
 }
 

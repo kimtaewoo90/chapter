@@ -12,6 +12,7 @@ class TodayPhotoSection extends StatelessWidget {
     super.key,
     required this.displayUris,
     required this.newPhotoFiles,
+    this.maxPhotos = 3,
     this.isPickingPhotos = false,
     required this.onPickMultiple,
     required this.onPickCamera,
@@ -22,6 +23,7 @@ class TodayPhotoSection extends StatelessWidget {
 
   final List<String> displayUris;
   final List<File> newPhotoFiles;
+  final int maxPhotos;
   final bool isPickingPhotos;
   final VoidCallback onPickMultiple;
   final VoidCallback onPickCamera;
@@ -34,12 +36,15 @@ class TodayPhotoSection extends StatelessWidget {
         ...newPhotoFiles.map((f) => _TodayPhotoEntry.local(f)),
       ];
 
+  bool get _canAddMore => _entries.length < maxPhotos;
+
   @override
   Widget build(BuildContext context) {
     final entries = _entries;
     if (entries.isEmpty) {
       return _EmptyTodayCut(
         isPickingPhotos: isPickingPhotos,
+        canAddMore: _canAddMore,
         onAdd: () => showRecordPhotoSourceSheet(
           context,
           onGallery: onPickMultiple,
@@ -50,6 +55,8 @@ class TodayPhotoSection extends StatelessWidget {
 
     return _PhotoStackPreview(
       entries: entries,
+      maxPhotos: maxPhotos,
+      canAddMore: _canAddMore,
       isPickingPhotos: isPickingPhotos,
       onTapOpen: () => _openGallerySheet(context, entries),
       onAdd: () => showRecordPhotoSourceSheet(
@@ -72,6 +79,8 @@ class TodayPhotoSection extends StatelessWidget {
       ),
       builder: (ctx) => _TodayPhotoGallerySheet(
         entries: entries,
+        maxPhotos: maxPhotos,
+        canAddMore: _canAddMore,
         onAddMore: () => showRecordPhotoSourceSheet(
           context,
           onGallery: onPickMultiple,
@@ -103,16 +112,22 @@ class _TodayPhotoEntry {
 
 /// 사진 없을 때 — 스택 영역 중앙에 「오늘의 컷」 폴라로이드
 class _EmptyTodayCut extends StatelessWidget {
-  const _EmptyTodayCut({required this.onAdd, this.isPickingPhotos = false});
+  const _EmptyTodayCut({
+    required this.onAdd,
+    this.isPickingPhotos = false,
+    this.canAddMore = true,
+  });
 
   final VoidCallback onAdd;
   final bool isPickingPhotos;
+  final bool canAddMore;
 
   @override
   Widget build(BuildContext context) {
     return _TodayPhotoStackFrame(
-      onTap: onAdd,
-      onAdd: onAdd,
+      onTap: canAddMore ? onAdd : null,
+      onAdd: canAddMore ? onAdd : null,
+      canAddMore: canAddMore,
       isPickingPhotos: isPickingPhotos,
       child: const Stack(
         alignment: Alignment.center,
@@ -129,12 +144,16 @@ class _PhotoStackPreview extends StatelessWidget {
     required this.entries,
     required this.onTapOpen,
     required this.onAdd,
+    required this.maxPhotos,
+    this.canAddMore = true,
     this.isPickingPhotos = false,
   });
 
   final List<_TodayPhotoEntry> entries;
   final VoidCallback onTapOpen;
   final VoidCallback onAdd;
+  final int maxPhotos;
+  final bool canAddMore;
   final bool isPickingPhotos;
 
   static const _offsets = [
@@ -151,7 +170,8 @@ class _PhotoStackPreview extends StatelessWidget {
 
     return _TodayPhotoStackFrame(
       onTap: onTapOpen,
-      onAdd: onAdd,
+      onAdd: canAddMore ? onAdd : null,
+      canAddMore: canAddMore,
       isPickingPhotos: isPickingPhotos,
       badge: count > 1
           ? Container(
@@ -161,7 +181,7 @@ class _PhotoStackPreview extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                '$count장 · 탭해서 보기',
+                '$count/$maxPhotos장 · 탭해서 보기',
                 style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
               ),
             )
@@ -190,13 +210,15 @@ class _TodayPhotoStackFrame extends StatelessWidget {
     required this.onAdd,
     required this.child,
     this.badge,
+    this.canAddMore = true,
     this.isPickingPhotos = false,
   });
 
-  final VoidCallback onTap;
-  final VoidCallback onAdd;
+  final VoidCallback? onTap;
+  final VoidCallback? onAdd;
   final Widget child;
   final Widget? badge;
+  final bool canAddMore;
   final bool isPickingPhotos;
 
   @override
@@ -235,11 +257,12 @@ class _TodayPhotoStackFrame extends StatelessWidget {
               bottom: 12,
               child: badge!,
             ),
-          Positioned(
-            right: 12,
-            bottom: 12,
-            child: _AddPhotoFab(onTap: isPickingPhotos ? null : onAdd),
-          ),
+          if (canAddMore)
+            Positioned(
+              right: 12,
+              bottom: 12,
+              child: _AddPhotoFab(onTap: isPickingPhotos ? null : onAdd),
+            ),
           if (isPickingPhotos)
             Positioned.fill(
               child: IgnorePointer(
@@ -405,6 +428,8 @@ class _TodayPhotoGallerySheet extends StatefulWidget {
     required this.onRemoveDisplay,
     required this.onRemoveNew,
     required this.onReorderCombined,
+    required this.maxPhotos,
+    this.canAddMore = true,
   });
 
   final List<_TodayPhotoEntry> entries;
@@ -412,6 +437,8 @@ class _TodayPhotoGallerySheet extends StatefulWidget {
   final ValueChanged<String> onRemoveDisplay;
   final ValueChanged<int> onRemoveNew;
   final void Function(List<String> reorderedDisplayUris, List<File> reorderedNewFiles) onReorderCombined;
+  final int maxPhotos;
+  final bool canAddMore;
 
   @override
   State<_TodayPhotoGallerySheet> createState() => _TodayPhotoGallerySheetState();
@@ -475,7 +502,7 @@ class _TodayPhotoGallerySheetState extends State<_TodayPhotoGallerySheet> {
                       children: [
                         Text('오늘의 장면', style: Theme.of(context).textTheme.titleMedium),
                         Text(
-                          '${_items.length}장',
+                          '${_items.length}/${widget.maxPhotos}장',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
                         ),
                       ],
@@ -493,23 +520,33 @@ class _TodayPhotoGallerySheetState extends State<_TodayPhotoGallerySheet> {
             Expanded(
               child: _reorderMode ? _reorderList() : _photoGrid(),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                  widget.onAddMore();
-                },
-                icon: const Icon(Icons.add_photo_alternate_outlined, size: 20),
-                label: const Text('사진 추가'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.accent,
-                  side: const BorderSide(color: AppTheme.accent),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            if (widget.canAddMore)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    widget.onAddMore();
+                  },
+                  icon: const Icon(Icons.add_photo_alternate_outlined, size: 20),
+                  label: const Text('사진 추가'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.accent,
+                    side: const BorderSide(color: AppTheme.accent),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: Text(
+                  '하루 최대 ${widget.maxPhotos}장까지 담을 수 있어요.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
                 ),
               ),
-            ),
           ],
         ),
       ),

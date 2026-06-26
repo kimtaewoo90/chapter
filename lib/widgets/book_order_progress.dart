@@ -4,52 +4,42 @@ import 'package:intl/intl.dart';
 import '../core/theme/app_theme.dart';
 import '../models/book_order.dart';
 
-/// 책 제작 파이프라인 단계
+/// 책 제작 진행 — 사용자-facing 5단계
 class BookOrderPipeline {
   BookOrderPipeline._();
 
   static const steps = [
-    '주문 · 스냅샷',
     '입금 대기',
-    '입금 확인',
-    'PDF 제작',
-    '인쇄',
-    '배송',
+    '입금 완료',
+    '제작중',
+    '배송중',
+    '배송완료',
   ];
 
-  /// 완료된 마지막 단계 인덱스 (0-based)
-  static int completedIndex(BookOrderStatus status) => switch (status) {
-        BookOrderStatus.pendingPayment => 0,
-        BookOrderStatus.paid => 2,
-        BookOrderStatus.processing => 3,
-        BookOrderStatus.printed => 4,
-        BookOrderStatus.shipped => 5,
-        BookOrderStatus.cancelled => -1,
-      };
+  static int completedIndex(BookOrderStatus status) {
+    final step = status.displayStep;
+    if (step < 0) return -1;
+    return step;
+  }
 
-  /// 현재 진행 중인 단계 인덱스
-  static int activeIndex(BookOrderStatus status) => switch (status) {
-        BookOrderStatus.pendingPayment => 1,
-        BookOrderStatus.paid => 2,
-        BookOrderStatus.processing => 3,
-        BookOrderStatus.printed => 4,
-        BookOrderStatus.shipped => 5,
-        BookOrderStatus.cancelled => 0,
-      };
+  static int activeIndex(BookOrderStatus status) {
+    final step = status.displayStep;
+    if (step < 0) return 0;
+    return step;
+  }
 
-  static bool isInProgress(BookOrderStatus status) =>
-      status != BookOrderStatus.shipped && status != BookOrderStatus.cancelled;
+  static bool isInProgress(BookOrderStatus status) => status.showInBookList;
 }
 
 class BookOrderProgressCard extends StatelessWidget {
   const BookOrderProgressCard({
     super.key,
     required this.order,
-    this.compact = false,
+    this.onTap,
   });
 
   final BookOrder order;
-  final bool compact;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -59,21 +49,16 @@ class BookOrderProgressCard extends StatelessWidget {
         ? DateFormat('M월 d일', 'ko_KR').format(order.createdAt!)
         : null;
     final cancelled = order.status == BookOrderStatus.cancelled;
-    final done = order.status == BookOrderStatus.shipped;
     final completed = BookOrderPipeline.completedIndex(order.status);
     final active = BookOrderPipeline.activeIndex(order.status);
 
-    return Container(
+    final card = Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: done
-              ? AppTheme.accent.withValues(alpha: 0.35)
-              : AppTheme.paperDark.withValues(alpha: 0.8),
-        ),
+        border: Border.all(color: AppTheme.paperDark.withValues(alpha: 0.8)),
         boxShadow: [
           BoxShadow(
             color: AppTheme.warmShadow.withValues(alpha: 0.35),
@@ -103,18 +88,24 @@ class BookOrderProgressCard extends StatelessWidget {
                       ].join(' · '),
                       style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
                     ),
+                    if (onTap != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        '탭해서 디지털 미리보기',
+                        style: textTheme.labelSmall?.copyWith(color: AppTheme.accent),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              _StatusChip(status: order.status),
+              BookOrderStatusChip(status: order.status),
             ],
           ),
-          if (!compact && !cancelled) ...[
+          if (!cancelled) ...[
             const SizedBox(height: 16),
             _StepperRow(
               completedIndex: completed,
               activeIndex: active,
-              done: done,
             ),
           ],
           if (cancelled)
@@ -128,23 +119,34 @@ class BookOrderProgressCard extends StatelessWidget {
         ],
       ),
     );
+
+    if (onTap == null) return card;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: card,
+      ),
+    );
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status});
+class BookOrderStatusChip extends StatelessWidget {
+  const BookOrderStatusChip({super.key, required this.status});
 
   final BookOrderStatus status;
 
   @override
   Widget build(BuildContext context) {
-    final (bg, fg) = switch (status) {
-      BookOrderStatus.pendingPayment => (const Color(0xFFFFF3E0), const Color(0xFFE65100)),
-      BookOrderStatus.paid => (AppTheme.accent.withValues(alpha: 0.12), AppTheme.accent),
-      BookOrderStatus.processing => (const Color(0xFFE3F2FD), const Color(0xFF1565C0)),
-      BookOrderStatus.printed => (const Color(0xFFE8F5E9), const Color(0xFF2E7D32)),
-      BookOrderStatus.shipped => (const Color(0xFFE8F5E9), const Color(0xFF1B5E20)),
-      BookOrderStatus.cancelled => (Colors.black12, AppTheme.inkMuted),
+    final (bg, fg) = switch (status.displayStep) {
+      0 => (const Color(0xFFFFF3E0), const Color(0xFFE65100)),
+      1 => (AppTheme.accent.withValues(alpha: 0.12), AppTheme.accent),
+      2 => (const Color(0xFFE3F2FD), const Color(0xFF1565C0)),
+      3 => (const Color(0xFFE8EAF6), const Color(0xFF3949AB)),
+      4 => (const Color(0xFFE8F5E9), const Color(0xFF1B5E20)),
+      _ => (Colors.black12, AppTheme.inkMuted),
     };
 
     return Container(
@@ -165,12 +167,10 @@ class _StepperRow extends StatelessWidget {
   const _StepperRow({
     required this.completedIndex,
     required this.activeIndex,
-    required this.done,
   });
 
   final int completedIndex;
   final int activeIndex;
-  final bool done;
 
   @override
   Widget build(BuildContext context) {
@@ -181,9 +181,9 @@ class _StepperRow extends StatelessWidget {
       children: [
         Row(
           children: List.generate(steps.length, (i) {
-            final isComplete = i <= completedIndex || done;
-            final isActive = !done && i == activeIndex;
-            final lineColor = isComplete ? AppTheme.accent : AppTheme.paperDark;
+            final isComplete = i < completedIndex;
+            final isCurrent = i == activeIndex;
+            final lineColor = isComplete || isCurrent ? AppTheme.accent : AppTheme.paperDark;
 
             return Expanded(
               child: Row(
@@ -191,15 +191,18 @@ class _StepperRow extends StatelessWidget {
                   Expanded(
                     child: i == 0
                         ? const SizedBox.shrink()
-                        : Container(height: 2, color: lineColor.withValues(alpha: isComplete ? 1 : 0.35)),
+                        : Container(
+                            height: 2,
+                            color: lineColor.withValues(alpha: (i <= activeIndex) ? 1 : 0.35),
+                          ),
                   ),
-                  _StepDot(complete: isComplete, active: isActive),
+                  _StepDot(complete: isComplete, active: isCurrent),
                   Expanded(
                     child: i == steps.length - 1
                         ? const SizedBox.shrink()
                         : Container(
                             height: 2,
-                            color: (i < completedIndex || done)
+                            color: (i < activeIndex)
                                 ? AppTheme.accent
                                 : AppTheme.paperDark.withValues(alpha: 0.35),
                           ),
@@ -210,23 +213,24 @@ class _StepperRow extends StatelessWidget {
           }),
         ),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 4,
-          runSpacing: 4,
+        Row(
           children: List.generate(steps.length, (i) {
-            final isComplete = i <= completedIndex || done;
-            final isActive = !done && i == activeIndex;
-            return Text(
-              steps[i],
-              style: TextStyle(
-                fontSize: 9,
-                height: 1.2,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                color: isActive
-                    ? AppTheme.accent
-                    : isComplete
-                        ? AppTheme.ink.withValues(alpha: 0.75)
-                        : AppTheme.inkMuted.withValues(alpha: 0.55),
+            final isComplete = i < completedIndex;
+            final isCurrent = i == activeIndex;
+            return Expanded(
+              child: Text(
+                steps[i],
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 9,
+                  height: 1.2,
+                  fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                  color: isCurrent
+                      ? AppTheme.accent
+                      : isComplete
+                          ? AppTheme.ink.withValues(alpha: 0.75)
+                          : AppTheme.inkMuted.withValues(alpha: 0.55),
+                ),
               ),
             );
           }),

@@ -1,5 +1,7 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import '../constants/diary_limits.dart';
+
 /// Gemini API — `.env` 또는 `--dart-define` (우선순위: dart-define > .env)
 class AiConfig {
   AiConfig._();
@@ -34,7 +36,7 @@ class AiConfig {
   /// 비전+텍스트용 (빠르고 저렴)
   static const String geminiModel = 'gemini-2.0-flash';
 
-  static const int maxPhotosForVision = 3;
+  static int get maxPhotosForVision => DiaryLimits.maxPhotosPerEntry;
   static const int maxPhotoBytes = 3 * 1024 * 1024;
   static const int photoMaxEdgePx = 1024;
 }

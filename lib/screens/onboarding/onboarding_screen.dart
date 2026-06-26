@@ -6,6 +6,7 @@ import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/user_preferences.dart';
 import '../../providers/app_state.dart';
+import '../../services/analytics_service.dart';
 import '../../widgets/onboarding_book_lottie.dart';
 import '../../widgets/onboarding_previews.dart';
 import '../../widgets/paper_background.dart';
@@ -68,6 +69,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
                   controller: _pageController,
                   onPageChanged: (i) {
                     setState(() => _page = i);
+                    context.read<AnalyticsService>().logOnboardingStep(i);
                     if (i == 1) _stackController.forward(from: 0);
                   },
                   children: [
@@ -266,15 +268,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
       );
       return;
     }
-    context.read<AppState>().completeOnboarding(
-          UserPreferences(
-            weather: _weather,
-            recordStyle: _recordStyle,
-            chronotype: _chronotype,
-            colorTone: _colorTone,
-            keywords: _keywords,
-          ),
-        );
+    final prefs = UserPreferences(
+      weather: _weather,
+      recordStyle: _recordStyle,
+      chronotype: _chronotype,
+      colorTone: _colorTone,
+      keywords: _keywords,
+    );
+    context.read<AnalyticsService>().logOnboardingComplete(prefs);
+    context.read<AppState>().completeOnboarding(prefs);
   }
 }
 

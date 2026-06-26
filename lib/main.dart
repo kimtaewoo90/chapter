@@ -6,10 +6,12 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'app/chapter_app.dart';
+import 'core/analytics/analytics_route_observer.dart';
 import 'core/config/ai_config.dart';
 import 'core/firebase_bootstrap.dart';
 import 'firebase_options.dart';
 import 'providers/app_state.dart';
+import 'services/analytics_service.dart';
 import 'services/chapter_service.dart';
 import 'services/entry_service.dart';
 import 'services/local_chapter_service.dart';
@@ -36,16 +38,28 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('Firebase init skipped: $e');
   }
-  runApp(const ChapterRoot());
+  final analytics = AnalyticsService();
+  await analytics.initialize();
+  final analyticsObserver = AnalyticsRouteObserver(analytics);
+  runApp(ChapterRoot(analytics: analytics, analyticsObserver: analyticsObserver));
 }
 
 class ChapterRoot extends StatelessWidget {
-  const ChapterRoot({super.key});
+  const ChapterRoot({
+    super.key,
+    required this.analytics,
+    required this.analyticsObserver,
+  });
+
+  final AnalyticsService analytics;
+  final AnalyticsRouteObserver analyticsObserver;
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        Provider.value(value: analytics),
+        Provider.value(value: analyticsObserver),
         Provider(create: (_) => LocalEntryService()),
         Provider(create: (_) => LocalChapterService()),
         Provider(create: (_) => StoryArcService()),

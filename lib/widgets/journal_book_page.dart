@@ -25,7 +25,7 @@ class JournalBookPage extends StatelessWidget {
   final int pageNumber;
   final int totalPages;
   final VoidCallback? onTap;
-  /// 크게 보기 — 페이지 안에서 위아래 스크롤
+  /// 펼쳐보기 — 페이지 안에서 위아래 스크롤
   final bool scrollable;
 
   @override

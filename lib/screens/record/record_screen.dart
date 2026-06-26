@@ -7,13 +7,16 @@ import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/constants/diary_limits.dart';
 import '../../core/constants/moods.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/entry_diary_ai.dart';
 import '../../core/utils/entry_photos.dart';
 import '../../core/utils/picked_photo_processor.dart';
 import '../../models/daily_entry.dart';
 import '../../models/record_save_step.dart';
 import '../../providers/app_state.dart';
+import '../../services/analytics_service.dart';
 import '../../widgets/record_save_overlay.dart';
 import '../../widgets/dismiss_keyboard.dart';
 import '../../widgets/mood_selector.dart';
@@ -98,7 +101,7 @@ class _RecordScreenState extends State<RecordScreen> {
         files.add(f);
       }
     }
-    return files.take(4).toList();
+    return files.take(DiaryLimits.maxPhotosPerEntry).toList();
   }
 
   String _photoFingerprint() {
@@ -116,12 +119,28 @@ class _RecordScreenState extends State<RecordScreen> {
     });
   }
 
-  Future<void> _addStagedPhotos(List<File> staged) async {
+  int _photoCount(DailyEntry? entry) => _displayPhotoUris(entry).length;
+
+  int _remainingPhotoSlots(DailyEntry? entry) =>
+      DiaryLimits.maxPhotosPerEntry - _photoCount(entry);
+
+  Future<void> _addStagedPhotos(List<File> staged, DailyEntry? entry) async {
     if (staged.isEmpty) return;
+    final remaining = _remainingPhotoSlots(entry);
+    if (remaining <= 0) {
+      _showPickError('사진은 하루 최대 ${DiaryLimits.maxPhotosPerEntry}장까지예요.');
+      return;
+    }
+    final toAdd = staged.take(remaining).toList();
+    if (toAdd.length < staged.length) {
+      _showPickError(
+        '사진은 하루 최대 ${DiaryLimits.maxPhotosPerEntry}장까지예요. ${toAdd.length}장만 추가했어요.',
+      );
+    }
     setState(() {
       _photosEdited = true;
-      _ensurePhotoEditState(context.read<AppState>().entryForDay(_day(context.read<AppState>())));
-      _keptLocalPaths.addAll(staged.map((f) => f.path));
+      _ensurePhotoEditState(entry);
+      _keptLocalPaths.addAll(toAdd.map((f) => f.path));
     });
     _scheduleAiMoodSuggestions();
   }
@@ -215,14 +234,43 @@ class _RecordScreenState extends State<RecordScreen> {
     super.dispose();
   }
 
-  Future<void> _pickMultiple() async {
-    try {
-      final images = await _picker.pickMultiImage(
+  Future<List<XFile>> _pickGalleryImages(int remaining) async {
+    final options = (
+      maxWidth: PickedPhotoProcessor.maxWidth,
+      maxHeight: PickedPhotoProcessor.maxHeight,
+      imageQuality: PickedPhotoProcessor.imageQuality,
+    );
+
+    // image_picker: pickMultiImage limit는 2 이상만 허용
+    if (remaining <= 1) {
+      final image = await _picker.pickImage(
+        source: ImageSource.gallery,
         requestFullMetadata: false,
-        maxWidth: PickedPhotoProcessor.maxWidth,
-        maxHeight: PickedPhotoProcessor.maxHeight,
-        imageQuality: PickedPhotoProcessor.imageQuality,
+        maxWidth: options.maxWidth,
+        maxHeight: options.maxHeight,
+        imageQuality: options.imageQuality,
       );
+      return image == null ? const [] : [image];
+    }
+
+    return _picker.pickMultiImage(
+      requestFullMetadata: false,
+      maxWidth: options.maxWidth,
+      maxHeight: options.maxHeight,
+      imageQuality: options.imageQuality,
+      limit: remaining,
+    );
+  }
+
+  Future<void> _pickMultiple() async {
+    final entry = _entryForDay(context.read<AppState>());
+    final remaining = _remainingPhotoSlots(entry);
+    if (remaining <= 0) {
+      _showPickError('사진은 하루 최대 ${DiaryLimits.maxPhotosPerEntry}장까지예요.');
+      return;
+    }
+    try {
+      final images = await _pickGalleryImages(remaining);
       if (!mounted || images.isEmpty) return;
 
       setState(() => _pickingPhotos = true);
@@ -236,7 +284,7 @@ class _RecordScreenState extends State<RecordScreen> {
         _showPickError('사진을 불러오지 못했어요. 다시 시도해 주세요.');
         return;
       }
-      await _addStagedPhotos(staged);
+      await _addStagedPhotos(staged, entry);
     } catch (e) {
       if (mounted) _showPickError('갤러리를 열지 못했어요. 권한을 확인해 주세요.');
     } finally {
@@ -245,6 +293,11 @@ class _RecordScreenState extends State<RecordScreen> {
   }
 
   Future<void> _pickCamera() async {
+    final entry = _entryForDay(context.read<AppState>());
+    if (_remainingPhotoSlots(entry) <= 0) {
+      _showPickError('사진은 하루 최대 ${DiaryLimits.maxPhotosPerEntry}장까지예요.');
+      return;
+    }
     try {
       final x = await _picker.pickImage(
         source: ImageSource.camera,
@@ -263,7 +316,7 @@ class _RecordScreenState extends State<RecordScreen> {
         _showPickError('사진을 저장하지 못했어요. 다시 찍어 주세요.');
         return;
       }
-      await _addStagedPhotos([staged]);
+      await _addStagedPhotos([staged], entry);
     } catch (e) {
       if (mounted) {
         _showPickError('카메라를 열지 못했어요. 설정에서 카메라 권한을 허용해 주세요.');
@@ -393,6 +446,13 @@ class _RecordScreenState extends State<RecordScreen> {
         await Future.delayed(const Duration(milliseconds: 650));
       }
       if (!mounted) return;
+      context.read<AnalyticsService>().logDiarySave(
+            isToday: appState.isToday(day),
+            hasPhotos: saved.hasPhotos,
+            hasMood: saved.moodEmoji != null,
+            hasNote: saved.note != null && saved.note!.trim().isNotEmpty,
+            hasAiLine: EntryDiaryAi.primaryDiaryText(saved) != null,
+          );
       setState(() {
         _saving = false;
         _saveOverlayComplete = false;
@@ -401,9 +461,7 @@ class _RecordScreenState extends State<RecordScreen> {
       });
       widget.onSavedSuccessfully?.call();
       if (mounted) {
-        final appState = context.read<AppState>();
         final cloudMsg = appState.lastCloudSyncError;
-        final day = _day(appState);
         final savedLabel = appState.isToday(day)
             ? '오늘이 책에 남았습니다.'
             : '${DateFormat('M월 d일', 'ko_KR').format(day)} 기록을 저장했어요.';
@@ -514,10 +572,17 @@ class _RecordScreenState extends State<RecordScreen> {
                       '오늘의 장면',
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
+                    Text(
+                      '최대 ${DiaryLimits.maxPhotosPerEntry}장',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: AppTheme.inkMuted,
+                          ),
+                    ),
                     const SizedBox(height: 10),
                     TodayPhotoSection(
                       displayUris: displayUris,
                       newPhotoFiles: _newPhotoFiles,
+                      maxPhotos: DiaryLimits.maxPhotosPerEntry,
                       isPickingPhotos: _pickingPhotos,
                       onPickMultiple: _pickMultiple,
                       onPickCamera: _pickCamera,
