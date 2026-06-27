@@ -11,7 +11,7 @@ import '../../providers/app_state.dart';
 import '../../services/book_order_service.dart';
 import '../../widgets/book_order_progress.dart';
 import '../../widgets/book_pdf_preview.dart';
-import '../../widgets/chapter_bottom_bar.dart';
+import '../../core/layout/shell_insets.dart';
 import '../../widgets/paper_background.dart';
 import 'book_entry_select_screen.dart';
 import 'book_order_preview_screen.dart';
@@ -54,7 +54,7 @@ class _BookScreenState extends State<BookScreen> {
     final authUid = state.cloudAuthUid;
     final entries = state.allEntries;
     final progress = state.bookProgress;
-    final bottomPad = widget.embedInShell ? ChapterBottomBar.listBottomPadding(context) : 0.0;
+    final bottomPad = widget.embedInShell ? ShellInsets.bottom(context) : 0.0;
     final textTheme = Theme.of(context).textTheme;
 
     return PaperBackground(

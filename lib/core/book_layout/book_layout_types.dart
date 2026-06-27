@@ -37,12 +37,16 @@ class BookDiaryEntry {
     required this.title,
     required this.body,
     this.photoUris = const [],
+    this.moodEmoji,
+    this.moodLabel,
   });
 
   final String date;
   final String title;
   final String body;
   final List<String> photoUris;
+  final String? moodEmoji;
+  final String? moodLabel;
 
   int get photoCount => photoUris.length;
 }

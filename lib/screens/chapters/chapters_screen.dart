@@ -8,7 +8,7 @@ import '../../core/utils/chapter_cover.dart';
 import '../../models/chapter_model.dart';
 import '../../models/daily_entry.dart';
 import '../../providers/app_state.dart';
-import '../../widgets/chapter_bottom_bar.dart';
+import '../../core/layout/shell_insets.dart';
 import '../../widgets/entry_photo.dart';
 import '../../widgets/paper_background.dart';
 import 'chapter_detail_screen.dart';
@@ -29,7 +29,7 @@ class ChaptersScreen extends StatelessWidget {
     final state = context.watch<AppState>();
     final chapters = state.allChapters;
     final entries = state.allEntries;
-    final bottomPad = embedInShell ? ChapterBottomBar.listBottomPadding(context) : 0.0;
+    final bottomPad = embedInShell ? ShellInsets.bottom(context) : 0.0;
     final periodFmt = DateFormat('yyyy.MM', 'ko_KR');
 
     return PaperBackground(

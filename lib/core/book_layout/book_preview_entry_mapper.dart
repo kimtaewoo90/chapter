@@ -9,11 +9,6 @@ class BookPreviewEntryMapper {
   BookPreviewEntryMapper._();
 
   static BookDiaryEntry fromDailyEntry(DailyEntry entry) {
-    final dateFmt = '${entry.date.month}월 ${entry.date.day}일';
-    final moodPart = entry.moodLabel?.trim().isNotEmpty == true
-        ? entry.moodLabel!.trim()
-        : (entry.moodEmoji ?? '');
-    final titleSuffix = moodPart.isNotEmpty ? ' - $moodPart' : '';
     final body = EntryDiaryAi.primaryDiaryText(entry)?.trim() ?? '';
     final photoUris = EntryPhotos.displayUris(
       localPaths: entry.localPhotoPaths,
@@ -22,10 +17,40 @@ class BookPreviewEntryMapper {
 
     return BookDiaryEntry(
       date: entry.dateKey,
-      title: '$dateFmt$titleSuffix',
+      title: '',
       body: body,
       photoUris: photoUris,
+      moodEmoji: entry.moodEmoji,
+      moodLabel: entry.moodLabel,
     );
+  }
+
+  /// PDF 헤더용 — `☕ 여유` / 이모지만 / 라벨만
+  static String? formatMoodDisplay({
+    String? moodEmoji,
+    String? moodLabel,
+  }) {
+    final emoji = moodEmoji?.trim();
+    final label = moodLabel?.trim();
+    final hasEmoji = emoji != null && emoji.isNotEmpty;
+    final hasLabel = label != null && label.isNotEmpty;
+    if (hasEmoji && hasLabel) return '$emoji $label';
+    if (hasEmoji) return emoji;
+    if (hasLabel) return label;
+    return null;
+  }
+
+  /// `2026-03-15` → `3월 15일` (PDF 헤더용)
+  static String formatDateLabel(String dateKey) {
+    final parts = dateKey.split('-');
+    if (parts.length == 3) {
+      final month = int.tryParse(parts[1]);
+      final day = int.tryParse(parts[2]);
+      if (month != null && day != null) {
+        return '$month월 $day일';
+      }
+    }
+    return dateKey;
   }
 
   static List<BookDiaryEntry> fromDailyEntries(List<DailyEntry> entries) {
@@ -35,9 +60,11 @@ class BookPreviewEntryMapper {
   static BookDiaryEntry fromSnapshot(BookEntrySnapshot snapshot) {
     return BookDiaryEntry(
       date: snapshot.date,
-      title: snapshot.title,
+      title: '',
       body: snapshot.body,
       photoUris: snapshot.photoUrls,
+      moodEmoji: snapshot.moodEmoji,
+      moodLabel: snapshot.moodLabel,
     );
   }
 

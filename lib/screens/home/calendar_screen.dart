@@ -10,7 +10,6 @@ import '../../services/analytics_service.dart';
 import '../../widgets/entry_photo.dart';
 import '../../widgets/paper_background.dart';
 import '../feed/entry_day_sheet.dart';
-import '../../widgets/chapter_bottom_bar.dart';
 
 /// 기록한 날 — 사진 썸네일(없으면 무드), 탭하면 보기·수정
 class CalendarScreen extends StatefulWidget {
@@ -138,22 +137,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
 
     if (widget.embedded) {
-      return PaperBackground(
-        child: Padding(
-          padding: EdgeInsets.only(bottom: ChapterBottomBar.spreadBottomInset(context)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _MonthHeader(
-                monthLabel: monthLabel,
-                onPrevious: _goToPreviousMonth,
-                onNext: _goToNextMonth,
-              ),
-              const SizedBox(height: 4),
-              Expanded(child: monthPager),
-            ],
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _MonthHeader(
+            monthLabel: monthLabel,
+            onPrevious: _goToPreviousMonth,
+            onNext: _goToNextMonth,
           ),
-        ),
+          const SizedBox(height: 12),
+          Expanded(child: monthPager),
+        ],
       );
     }
 
@@ -202,12 +196,12 @@ class _CalendarMonthBody extends StatelessWidget {
     final daysInMonth = DateTime(focused.year, focused.month + 1, 0).day;
     final startWeekday = first.weekday % 7;
     final rowCount = (startWeekday + daysInMonth + 6) ~/ 7;
-    final bottomPad = embedded ? 0.0 : 16.0;
-    final topPad = compact ? 16.0 : 8.0;
-    final gridGap = compact ? 4.0 : 6.0;
+    final bottomPad = embedded ? 8.0 : 16.0;
+    final topPad = compact ? 8.0 : 8.0;
+    final gridGap = compact ? 5.0 : 6.0;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(compact ? 8 : 12, topPad, compact ? 8 : 12, bottomPad),
+      padding: EdgeInsets.fromLTRB(compact ? 0 : 12, topPad, compact ? 0 : 12, bottomPad),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -223,24 +217,27 @@ class _CalendarMonthBody extends StatelessWidget {
               _WeekdayLabel('토'),
             ],
           ),
-          SizedBox(height: compact ? 10 : 8),
+          SizedBox(height: compact ? 12 : 8),
           Expanded(
             child: _CalendarDayGrid(
-              rowCount: rowCount,
-              startWeekday: startWeekday,
-              daysInMonth: daysInMonth,
-              focused: focused,
-              byDay: byDay,
-              today: today,
-              gap: gridGap,
-              onDayTap: onDayTap,
-            ),
+                rowCount: rowCount,
+                startWeekday: startWeekday,
+                daysInMonth: daysInMonth,
+                focused: focused,
+                byDay: byDay,
+                today: today,
+                gap: gridGap,
+                onDayTap: onDayTap,
+              ),
           ),
         ],
       ),
     );
   }
 }
+
+/// 캘린더 셀 사진 영역 — 일기 사진과 동일한 3:4 세로 비율
+const _kCalendarPhotoAspectRatio = 3 / 4;
 
 class _CalendarDayGrid extends StatelessWidget {
   const _CalendarDayGrid({
@@ -265,47 +262,63 @@ class _CalendarDayGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: List.generate(rowCount, (row) {
-        return Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: List.generate(7, (col) {
-              final i = row * 7 + col;
-              Widget cell;
-              if (i < startWeekday || i >= startWeekday + daysInMonth) {
-                cell = const SizedBox.shrink();
-              } else {
-                final day = i - startWeekday + 1;
-                final date = DateTime(focused.year, focused.month, day);
-                final key =
-                    '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-                final entry = byDay[key];
-                final isToday = date.year == today.year &&
-                    date.month == today.month &&
-                    date.day == today.day;
-                final isFuture = date.isAfter(DateTime(today.year, today.month, today.day));
-                cell = _DayCell(
-                  day: day,
-                  entry: entry,
-                  isToday: isToday,
-                  isFuture: isFuture,
-                  onTap: isFuture ? null : () => onDayTap(date, entry),
-                );
-              }
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    right: col < 6 ? gap : 0,
-                    bottom: row < rowCount - 1 ? gap : 0,
-                  ),
-                  child: cell,
-                ),
-              );
-            }),
-          ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const dateRowHeight = 14.0;
+        const innerPad = 8.0;
+        final cellWidth = (constraints.maxWidth - gap * 6) / 7;
+        final photoHeight = cellWidth / _kCalendarPhotoAspectRatio;
+        final cellHeight = dateRowHeight + photoHeight + innerPad;
+        final naturalGridHeight = cellHeight * rowCount + gap * (rowCount - 1);
+        final scale = constraints.maxHeight > 0 && naturalGridHeight > 0
+            ? constraints.maxHeight / naturalGridHeight
+            : 1.0;
+        final rowHeight = cellHeight * scale;
+
+        return Column(
+          children: List.generate(rowCount, (row) {
+            return SizedBox(
+              height: rowHeight,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: List.generate(7, (col) {
+                  final i = row * 7 + col;
+                  Widget cell;
+                  if (i < startWeekday || i >= startWeekday + daysInMonth) {
+                    cell = const SizedBox.shrink();
+                  } else {
+                    final day = i - startWeekday + 1;
+                    final date = DateTime(focused.year, focused.month, day);
+                    final key =
+                        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+                    final entry = byDay[key];
+                    final isToday = date.year == today.year &&
+                        date.month == today.month &&
+                        date.day == today.day;
+                    final isFuture = date.isAfter(DateTime(today.year, today.month, today.day));
+                    cell = _DayCell(
+                      day: day,
+                      entry: entry,
+                      isToday: isToday,
+                      isFuture: isFuture,
+                      onTap: isFuture ? null : () => onDayTap(date, entry),
+                    );
+                  }
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        right: col < 6 ? gap : 0,
+                        bottom: row < rowCount - 1 ? gap : 0,
+                      ),
+                      child: cell,
+                    ),
+                  );
+                }),
+              ),
+            );
+          }),
         );
-      }),
+      },
     );
   }
 }
@@ -324,7 +337,7 @@ class _MonthHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
       child: Row(
         children: [
           IconButton(
@@ -417,8 +430,9 @@ class _DayCell extends StatelessWidget {
             ),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(4),
+            padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Align(
                   alignment: Alignment.topLeft,
@@ -436,38 +450,40 @@ class _DayCell extends StatelessWidget {
                   ),
                 ),
                 Expanded(
-                  child: Center(
-                    child: showPhoto
-                        ? SizedBox(
-                            width: 40,
-                            height: 40,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: AspectRatio(
+                      aspectRatio: _kCalendarPhotoAspectRatio,
+                      child: showPhoto
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
                               child: EntryPhoto(
                                 url: coverUri,
-                                height: 40,
-                                borderRadius: 8,
+                                height: double.infinity,
+                                borderRadius: 6,
                               ),
+                            )
+                          : Center(
+                              child: mood != null
+                                  ? Text(mood, style: const TextStyle(fontSize: 22))
+                                  : hasEntry
+                                      ? Container(
+                                          width: 6,
+                                          height: 6,
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.accent.withValues(alpha: 0.6),
+                                            shape: BoxShape.circle,
+                                          ),
+                                        )
+                                      : isFuture
+                                          ? const SizedBox.shrink()
+                                          : Icon(
+                                              Icons.add,
+                                              size: 16,
+                                              color: AppTheme.inkMuted.withValues(alpha: 0.45),
+                                            ),
                             ),
-                          )
-                        : mood != null
-                            ? Text(mood, style: const TextStyle(fontSize: 22))
-                            : hasEntry
-                                ? Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.accent.withValues(alpha: 0.6),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  )
-                                : isFuture
-                                    ? const SizedBox.shrink()
-                                    : Icon(
-                                        Icons.add,
-                                        size: 16,
-                                        color: AppTheme.inkMuted.withValues(alpha: 0.45),
-                                      ),
+                    ),
                   ),
                 ),
               ],

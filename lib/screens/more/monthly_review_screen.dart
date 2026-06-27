@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../providers/app_state.dart';
-import '../../widgets/chapter_bottom_bar.dart';
+import '../../core/layout/shell_insets.dart';
 import '../../widgets/paper_background.dart';
 
 /// 최근 30일 Story Arc 기반 월간 리포트
@@ -59,7 +59,7 @@ class _MonthlyReviewScreenState extends State<MonthlyReviewScreen> {
             20,
             8,
             20,
-            24 + ChapterBottomBar.listBottomPadding(context),
+            24 + ShellInsets.bottom(context),
           ),
           children: [
             if (review == null && !_loading)

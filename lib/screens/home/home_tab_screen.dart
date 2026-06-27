@@ -4,21 +4,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../services/analytics_service.dart';
+import '../../widgets/chapter_home_header.dart';
+import '../../widgets/paper_background.dart';
 import '../feed/feed_screen.dart';
 import 'calendar_screen.dart';
 
 enum HomeViewMode { calendar, bookSpread }
 
-/// 메인 탭 — 캘린더(기본) ↔ 펼쳐보기(나의 책) 전환
+/// 메인 화면 — 캘린더(기본) ↔ 펼쳐보기 전환
 class HomeTabScreen extends StatefulWidget {
   const HomeTabScreen({
     super.key,
     required this.onGoToRecord,
     required this.onGoToRecordForDate,
+    required this.onOpenMore,
   });
 
   final VoidCallback onGoToRecord;
   final void Function(DateTime date) onGoToRecordForDate;
+  final VoidCallback onOpenMore;
 
   @override
   State<HomeTabScreen> createState() => _HomeTabScreenState();
@@ -56,38 +60,53 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-            child: _ViewModeToggle(
-              mode: _mode,
-              onChanged: _setMode,
+    final bottomInset = MediaQuery.paddingOf(context).bottom + 20;
+
+    return PaperBackground(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ChapterHomeHeader(onOpenMore: widget.onOpenMore),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _ViewModeToggle(
+                    mode: _mode,
+                    onChanged: _setMode,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-        Expanded(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 280),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            child: _mode == HomeViewMode.calendar
-                ? CalendarScreen(
-                    key: const ValueKey('calendar'),
-                    embedded: true,
-                    onDateSelected: (date, _) => widget.onGoToRecordForDate(date),
-                  )
-                : FeedScreen(
-                    key: const ValueKey('book-spread-v2'),
-                    onGoToRecord: widget.onGoToRecord,
-                    showHeader: false,
-                  ),
+          const SizedBox(height: 20),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, bottomInset),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 280),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                child: _mode == HomeViewMode.calendar
+                    ? CalendarScreen(
+                        key: const ValueKey('calendar'),
+                        embedded: true,
+                        onDateSelected: (date, _) => widget.onGoToRecordForDate(date),
+                      )
+                    : FeedScreen(
+                        key: const ValueKey('book-spread-v2'),
+                        onGoToRecord: widget.onGoToRecord,
+                        showHeader: false,
+                      ),
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -103,36 +122,28 @@ class _ViewModeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('홈', style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 12),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppTheme.paperDark.withValues(alpha: 0.8)),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.paperDark.withValues(alpha: 0.8)),
+      ),
+      child: Row(
+        children: [
+          _ModeChip(
+            label: '캘린더',
+            icon: Icons.calendar_month_outlined,
+            selected: mode == HomeViewMode.calendar,
+            onTap: () => onChanged(HomeViewMode.calendar),
           ),
-          child: Row(
-            children: [
-              _ModeChip(
-                label: '캘린더',
-                icon: Icons.calendar_month_outlined,
-                selected: mode == HomeViewMode.calendar,
-                onTap: () => onChanged(HomeViewMode.calendar),
-              ),
-              _ModeChip(
-                label: '펼쳐보기',
-                icon: Icons.auto_stories_outlined,
-                selected: mode == HomeViewMode.bookSpread,
-                onTap: () => onChanged(HomeViewMode.bookSpread),
-              ),
-            ],
+          _ModeChip(
+            label: '펼쳐보기',
+            icon: Icons.auto_stories_outlined,
+            selected: mode == HomeViewMode.bookSpread,
+            onTap: () => onChanged(HomeViewMode.bookSpread),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

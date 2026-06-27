@@ -1,5 +1,4 @@
 import '../core/utils/entry_diary_ai.dart';
-import '../core/utils/entry_photos.dart';
 import 'daily_entry.dart';
 
 /// 주문 시점에 고정되는 일기 스냅샷 (PDF·인쇄용)
@@ -23,31 +22,36 @@ class BookEntrySnapshot {
   final String? moodLabel;
 
   factory BookEntrySnapshot.fromEntry(DailyEntry entry) {
-    final dateFmt = _monthDayLabel(entry.date);
-    final moodPart = entry.moodLabel?.trim().isNotEmpty == true
-        ? entry.moodLabel!.trim()
-        : (entry.moodEmoji ?? '');
-    final titleSuffix = moodPart.isNotEmpty ? ' - $moodPart' : '';
     final body = EntryDiaryAi.primaryDiaryText(entry)?.trim() ?? '';
-
-    final urls = EntryPhotos.displayUris(
-      localPaths: entry.localPhotoPaths,
-      remoteUrls: entry.remotePhotoUrls,
-    ).where(_isPrintableUrl).toList();
 
     return BookEntrySnapshot(
       date: entry.dateKey,
-      title: '$dateFmt$titleSuffix',
+      title: '',
       body: body,
-      photoUrls: urls,
+      photoUrls: snapshotPhotoUrls(entry),
       entryId: entry.id,
       moodEmoji: entry.moodEmoji,
       moodLabel: entry.moodLabel,
     );
   }
 
-  static String _monthDayLabel(DateTime date) =>
-      '${date.month}월 ${date.day}일';
+  /// PDF·주문용 — Firebase Storage URL만 (로컬 파일 경로는 admin PDF에서 사용 불가)
+  static List<String> snapshotPhotoUrls(DailyEntry entry) {
+    final locals = entry.localPhotoPaths;
+    final remotes = entry.remotePhotoUrls;
+
+    if (locals.isEmpty) {
+      return remotes.where(_isPrintableUrl).toList();
+    }
+
+    final urls = <String>[];
+    for (var i = 0; i < locals.length; i++) {
+      if (i < remotes.length && _isPrintableUrl(remotes[i])) {
+        urls.add(remotes[i]);
+      }
+    }
+    return urls;
+  }
 
   static bool _isPrintableUrl(String url) =>
       url.startsWith('http://') || url.startsWith('https://');

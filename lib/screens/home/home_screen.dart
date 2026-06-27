@@ -10,7 +10,7 @@ import '../../models/daily_entry.dart';
 import '../../providers/app_state.dart';
 import '../../widgets/entry_photo.dart';
 import '../../widgets/entry_photo_grid.dart';
-import '../../widgets/chapter_bottom_bar.dart';
+import '../../core/layout/shell_insets.dart';
 import '../../widgets/paper_background.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -77,7 +77,7 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               SliverToBoxAdapter(
-                child: SizedBox(height: 16 + ChapterBottomBar.listBottomPadding(context)),
+                child: SizedBox(height: 16 + ShellInsets.bottom(context)),
               ),
             ],
           ),

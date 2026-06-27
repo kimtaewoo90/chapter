@@ -28,8 +28,17 @@ class KoreanAddressInput extends StatelessWidget {
       context,
       MaterialPageRoute(builder: (_) => const KoreanAddressSearchScreen()),
     );
-    if (result != null) {
-      onAddressSelected(result);
+    if (result == null || !context.mounted) return;
+
+    onAddressSelected(result);
+
+    // 상세주소 TextField는 baseAddress 반영 후 enabled — 다음 프레임에 포커스
+    final detailFocus = detailFocusNode;
+    if (detailFocus != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        detailFocus.requestFocus();
+      });
     }
   }
 

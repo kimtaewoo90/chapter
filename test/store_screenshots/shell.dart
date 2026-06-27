@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'package:chapter/core/constants/app_fonts.dart';
 import 'package:chapter/core/theme/app_theme.dart';
-import 'package:chapter/widgets/chapter_bottom_bar.dart';
 
 /// App Store 6.7" — 1290×2796 px (프리미엄 마케팅 프레임)
 class StoreScreenshotFrame extends StatelessWidget {
@@ -11,17 +10,13 @@ class StoreScreenshotFrame extends StatelessWidget {
     required this.headline,
     required this.subheadline,
     required this.body,
-    this.selectedTab,
     this.dark = false,
-    this.showBottomBar = true,
   });
 
   final String headline;
   final String subheadline;
   final Widget body;
-  final int? selectedTab;
   final bool dark;
-  final bool showBottomBar;
 
   static const width = 1290.0;
   static const height = 2796.0;
@@ -83,8 +78,6 @@ class StoreScreenshotFrame extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(56, 8, 56, 0),
               child: _DeviceFrame(
-                selectedTab: selectedTab,
-                showBottomBar: showBottomBar,
                 child: body,
               ),
             ),
@@ -204,13 +197,9 @@ class _BrandRow extends StatelessWidget {
 class _DeviceFrame extends StatelessWidget {
   const _DeviceFrame({
     required this.child,
-    this.selectedTab,
-    this.showBottomBar = true,
   });
 
   final Widget child;
-  final int? selectedTab;
-  final bool showBottomBar;
 
   @override
   Widget build(BuildContext context) {
@@ -242,13 +231,6 @@ class _DeviceFrame extends StatelessWidget {
                 const _StatusBar(),
                 const _DynamicIsland(),
                 Expanded(child: child),
-                if (showBottomBar && selectedTab != null)
-                  ChapterBottomBar(
-                    currentIndex: selectedTab!,
-                    onSelect: (_) {},
-                    onRecord: () {},
-                    recordSelected: selectedTab == 1,
-                  ),
               ],
             ),
           ),

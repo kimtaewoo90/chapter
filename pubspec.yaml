@@ -1,7 +1,7 @@
 name: chapter
 description: CHAPTER — 감성 일기를 책으로 완성하는 라이프 아카이브
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.0+4
 
 environment:
   sdk: '>=3.2.0 <4.0.0'

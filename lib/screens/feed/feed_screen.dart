@@ -8,7 +8,6 @@ import '../../core/utils/entry_diary_ai.dart';
 import '../../models/daily_entry.dart';
 import '../../providers/app_state.dart';
 import '../../services/analytics_service.dart';
-import '../../widgets/chapter_bottom_bar.dart';
 import '../../widgets/chapter_whisper_banner.dart';
 import '../../widgets/journal_book_page.dart';
 import '../../widgets/paper_background.dart';
@@ -69,7 +68,6 @@ class _FeedScreenState extends State<FeedScreen> {
     final today = state.todayEntry;
     final showTodayPrompt = _isTodayBlank(today);
     final whisper = state.chapterWhisper;
-    final bottomInset = _embedded ? ChapterBottomBar.spreadBottomInset(context) : 0.0;
 
     if (whisper != null && whisper.arcId != _whisperMarkedId) {
       _whisperMarkedId = whisper.arcId;
@@ -93,130 +91,130 @@ class _FeedScreenState extends State<FeedScreen> {
       });
     }
 
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (widget.showHeader)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('나의 책', style: textTheme.titleLarge),
+                      Text(
+                        entries.isEmpty
+                            ? '첫 페이지를 써 보세요'
+                            : '옆으로 넘기며 읽어요',
+                        style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
+                      ),
+                    ],
+                  ),
+                ),
+                if (entries.isNotEmpty)
+                  Text(
+                    '${_currentPage + 1} / ${entries.length}',
+                    style: textTheme.labelMedium?.copyWith(color: AppTheme.accent),
+                  ),
+              ],
+            ),
+          )
+        else if (entries.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 2, 0, 2),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '← 과거 · → 최근 · ↑↓ 글 읽기',
+                    style: textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted),
+                  ),
+                ),
+                Text(
+                  '${_currentPage + 1} / ${entries.length}',
+                  style: textTheme.labelMedium?.copyWith(color: AppTheme.accent),
+                ),
+              ],
+            ),
+          ),
+        if (showTodayPrompt)
+          Padding(
+            padding: EdgeInsets.fromLTRB(_embedded ? 0 : 16, 4, _embedded ? 0 : 16, 8),
+            child: _TodayPagePrompt(onGoToRecord: widget.onGoToRecord),
+          ),
+        if (whisper != null)
+          Padding(
+            padding: EdgeInsets.fromLTRB(_embedded ? 0 : 16, 0, _embedded ? 0 : 16, 8),
+            child: ChapterWhisperBanner(message: whisper.message),
+          ),
+        Expanded(
+          child: entries.isEmpty
+              ? _EmptyBook(onGoToRecord: widget.onGoToRecord)
+              : PageView.builder(
+                  controller: _pageController,
+                  itemCount: entries.length,
+                  itemBuilder: (context, index) {
+                    final entry = entries[index];
+                    return AnimatedBuilder(
+                      animation: _pageController,
+                      builder: (context, child) {
+                        var scale = 1.0;
+                        var rotateY = 0.0;
+                        if (_pageController.position.haveDimensions) {
+                          final delta = (_pageController.page ?? 0) - index;
+                          scale = (1 - delta.abs() * 0.06).clamp(0.9, 1.0);
+                          rotateY = (-delta * 0.18).clamp(-0.25, 0.25);
+                        }
+                        return Transform(
+                          alignment: Alignment.centerLeft,
+                          transform: Matrix4.identity()
+                            ..setEntry(3, 2, 0.001)
+                            ..rotateY(rotateY)
+                            ..scale(scale),
+                          child: child,
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: JournalBookPage(
+                          entry: entry,
+                          pageNumber: entries.length - index,
+                          totalPages: entries.length,
+                          scrollable: _embedded,
+                          onTap: () {
+                            context.read<AnalyticsService>().logDiaryOpen(source: 'spread');
+                            showEntryDaySheet(context, entry);
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        if (entries.isNotEmpty && !_embedded)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12, top: 4),
+            child: Text(
+              '← 과거 · → 최근',
+              textAlign: TextAlign.center,
+              style: textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted),
+            ),
+          ),
+      ],
+    );
+
+    if (_embedded) {
+      return body;
+    }
+
     return PaperBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
           bottom: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (widget.showHeader)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('나의 책', style: textTheme.titleLarge),
-                            Text(
-                              entries.isEmpty
-                                  ? '첫 페이지를 써 보세요'
-                                  : '옆으로 넘기며 읽어요',
-                              style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (entries.isNotEmpty)
-                        Text(
-                          '${_currentPage + 1} / ${entries.length}',
-                          style: textTheme.labelMedium?.copyWith(color: AppTheme.accent),
-                        ),
-                    ],
-                  ),
-                )
-              else if (entries.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 2, 20, 2),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '← 과거 · → 최근 · ↑↓ 글 읽기',
-                          style: textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted),
-                        ),
-                      ),
-                      Text(
-                        '${_currentPage + 1} / ${entries.length}',
-                        style: textTheme.labelMedium?.copyWith(color: AppTheme.accent),
-                      ),
-                    ],
-                  ),
-                ),
-              if (showTodayPrompt)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                  child: _TodayPagePrompt(onGoToRecord: widget.onGoToRecord),
-                ),
-              if (whisper != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: ChapterWhisperBanner(message: whisper.message),
-                ),
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: bottomInset),
-                  child: entries.isEmpty
-                      ? _EmptyBook(onGoToRecord: widget.onGoToRecord)
-                      : PageView.builder(
-                          controller: _pageController,
-                          itemCount: entries.length,
-                          itemBuilder: (context, index) {
-                            final entry = entries[index];
-                            return AnimatedBuilder(
-                              animation: _pageController,
-                              builder: (context, child) {
-                                var scale = 1.0;
-                                var rotateY = 0.0;
-                                if (_pageController.position.haveDimensions) {
-                                  final delta = (_pageController.page ?? 0) - index;
-                                  scale = (1 - delta.abs() * 0.06).clamp(0.9, 1.0);
-                                  rotateY = (-delta * 0.18).clamp(-0.25, 0.25);
-                                }
-                                return Transform(
-                                  alignment: Alignment.centerLeft,
-                                  transform: Matrix4.identity()
-                                    ..setEntry(3, 2, 0.001)
-                                    ..rotateY(rotateY)
-                                    ..scale(scale),
-                                  child: child,
-                                );
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 6),
-                                child: JournalBookPage(
-                                  entry: entry,
-                                  pageNumber: entries.length - index,
-                                  totalPages: entries.length,
-                                  scrollable: _embedded,
-                                  onTap: () {
-                                    context.read<AnalyticsService>().logDiaryOpen(source: 'spread');
-                                    showEntryDaySheet(context, entry);
-                                  },
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ),
-              if (entries.isNotEmpty && !_embedded)
-                Padding(
-                  padding: EdgeInsets.only(
-                    bottom: ChapterBottomBar.listBottomPadding(context) * 0.35,
-                    top: 4,
-                  ),
-                  child: Text(
-                    '← 과거 · → 최근',
-                    textAlign: TextAlign.center,
-                    style: textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted),
-                  ),
-                ),
-            ],
-          ),
+          child: body,
         ),
       ),
     );

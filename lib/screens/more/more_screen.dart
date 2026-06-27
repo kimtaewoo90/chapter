@@ -6,7 +6,7 @@ import '../../core/constants/app_fonts.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/app_state.dart';
 import '../../services/analytics_service.dart';
-import '../../widgets/chapter_bottom_bar.dart';
+import '../../core/layout/shell_insets.dart';
 import '../../widgets/paper_background.dart';
 import '../book/book_screen.dart';
 import '../chapters/chapters_screen.dart';
@@ -15,7 +15,7 @@ import 'font_settings_screen.dart';
 import 'monthly_review_screen.dart';
 import 'notification_settings_screen.dart';
 
-/// 하단 탭 「더보기」— 캘린더·계정·설정
+/// 더보기 — 계정·설정·탐색
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
 
@@ -35,7 +35,7 @@ class MoreScreen extends StatelessWidget {
             20,
             8,
             20,
-            24 + ChapterBottomBar.listBottomPadding(context),
+            24 + ShellInsets.bottom(context),
           ),
           children: [
             _StatsCard(

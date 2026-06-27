@@ -208,6 +208,23 @@ class _RecordScreenState extends State<RecordScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final appState = context.read<AppState>();
+      final day = widget.targetDate ?? appState.todayDate;
+      final entry = appState.entryForDay(day);
+      if (entry != null && !_photosEdited) {
+        _syncFromEntry(entry);
+      }
+      if (appState.isToday(day)) {
+        appState.refreshTodayWeatherIfNeeded();
+      }
+    });
+  }
+
+  @override
   void didUpdateWidget(RecordScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isActive && !oldWidget.isActive) {

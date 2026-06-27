@@ -25,7 +25,6 @@ class StoreScreenshotScenes {
           widget: const StoreScreenshotFrame(
             headline: '당신의 이야기를,\n한 권의 챕터로',
             subheadline: '사진·무드·한 줄 — 가볍게 쌓이면\n조용히 한 권이 완성됩니다',
-            selectedTab: 0,
             body: _FeedScreenBody(),
           ),
         ),
@@ -34,7 +33,6 @@ class StoreScreenshotScenes {
           widget: const StoreScreenshotFrame(
             headline: '하루 한 페이지',
             subheadline: '사진, 무드, 날씨까지\n오늘을 한 장면으로 남겨요',
-            selectedTab: 1,
             body: _RecordScreenBody(),
           ),
         ),
@@ -43,7 +41,6 @@ class StoreScreenshotScenes {
           widget: const StoreScreenshotFrame(
             headline: '책장을 넘기듯',
             subheadline: '기록한 하루가\n종이 페이지가 됩니다',
-            selectedTab: 0,
             body: _FeedScreenBody(focusPage: true),
           ),
         ),
@@ -53,7 +50,6 @@ class StoreScreenshotScenes {
             headline: '기록이 모이면, 챕터가',
             subheadline: 'Story Arc가 이어지면\n한 편의 이야기로 완성돼요',
             dark: true,
-            showBottomBar: false,
             body: _ChapterRevealMock(
               title: '봄의 시작',
               period: '3월 1일 — 3월 24일',
@@ -66,7 +62,6 @@ class StoreScreenshotScenes {
           widget: const StoreScreenshotFrame(
             headline: '한 해, 한 권',
             subheadline: '진행률 · PDF · 완성된 챕터\n올해의 이야기를 책으로',
-            selectedTab: 2,
             body: _BookScreenBody(),
           ),
         ),
@@ -75,7 +70,6 @@ class StoreScreenshotScenes {
           widget: const StoreScreenshotFrame(
             headline: '돌아보는 인사이트',
             subheadline: '월간 리포트 · 캘린더 · 무드 통계\n기록이 쌓일수록 선명해져요',
-            selectedTab: 2,
             body: _InsightScreenBody(),
           ),
         ),

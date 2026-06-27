@@ -88,7 +88,15 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
       _zoneCode = result.postCode;
       _addressBase = result.userSelectedAddress;
     });
-    _addressDetailFocus.requestFocus();
+  }
+
+  List<DailyEntry> _resolvedEntries(AppState state) {
+    return widget.selectedEntries.map((selected) {
+      for (final current in state.allEntries) {
+        if (current.id == selected.id) return current;
+      }
+      return state.entryForDay(selected.date) ?? selected;
+    }).toList();
   }
 
   Future<void> _submitOrder() async {
@@ -110,7 +118,7 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
     try {
       final order = await _bookOrderService.createOrder(
         userId: authUid,
-        entries: widget.selectedEntries,
+        entries: _resolvedEntries(appState),
         bookTitle: _bookTitle,
         recipientName: _nameController.text.trim(),
         shippingAddress: _fullShippingAddress,
@@ -168,7 +176,8 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sorted = List<DailyEntry>.from(widget.selectedEntries)
+    final appState = context.watch<AppState>();
+    final sorted = List<DailyEntry>.from(_resolvedEntries(appState))
       ..sort((a, b) => a.date.compareTo(b.date));
 
     return PaperBackground(

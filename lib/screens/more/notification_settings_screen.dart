@@ -105,11 +105,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
               ),
             ],
             const SizedBox(height: 24),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(14),
-              ),
+            Material(
+              color: Colors.white.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(14),
               child: SwitchListTile(
                 title: const Text('매일 알림'),
                 subtitle: Text(

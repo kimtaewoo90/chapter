@@ -8,14 +8,17 @@ class PaperBackground extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
 
+  static Color get surfaceBottom =>
+      Color.lerp(AppTheme.paper, AppTheme.paperDark, 0.35)!;
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
+    return DecoratedBox(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [AppTheme.paper, AppTheme.paperDark],
+          colors: [AppTheme.paper, surfaceBottom],
         ),
       ),
       child: Stack(

@@ -211,7 +211,25 @@ class AnalyticsService {
     String name, {
     Map<String, Object>? parameters,
   }) async {
-    await _log((a) => a.logEvent(name: name, parameters: parameters));
+    await _log((a) => a.logEvent(
+          name: name,
+          parameters: _sanitizeParameters(parameters),
+        ));
+  }
+
+  /// Firebase Analytics 파라미터는 String 또는 num만 허용합니다.
+  Map<String, Object>? _sanitizeParameters(Map<String, Object>? parameters) {
+    if (parameters == null || parameters.isEmpty) return null;
+    return {
+      for (final entry in parameters.entries)
+        entry.key: _sanitizeParameterValue(entry.value),
+    };
+  }
+
+  Object _sanitizeParameterValue(Object value) {
+    if (value is String || value is num) return value;
+    if (value is bool) return value ? 1 : 0;
+    return value.toString();
   }
 
   Future<void> _log(Future<void> Function(FirebaseAnalytics analytics) action) async {

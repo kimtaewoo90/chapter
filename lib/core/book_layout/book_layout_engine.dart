@@ -102,13 +102,12 @@ class BookLayoutEngine {
   }
 
   static double _estimateFullHeight(BookDiaryEntry entry, BookLayoutPlan plan) {
-    final titleLines = ((entry.title.length).clamp(1, 9999) / 24).ceil();
     final charsPerLine = plan.textStyle == BookTextStyle.caption ? 40 : 32;
     final bodyLines = (entry.body.length / charsPerLine).ceil().clamp(1, 9999);
     final bodyLineHeight = plan.textStyle == BookTextStyle.fullStyle ? 14.0 : 12.0;
 
     var height = 18.0;
-    height += titleLines * 18 + 16;
+    height += 16 + 14;
     height += 14;
     final photos = _photoAreaHeight(plan, entry.photoCount);
     if (photos > 0) height += photos + 16;
@@ -118,10 +117,9 @@ class BookLayoutEngine {
   }
 
   static double _estimateCompactHeight(BookDiaryEntry entry) {
-    final titleLines = ((entry.title.length).clamp(1, 9999) / 24).ceil();
     final bodyLines = (entry.body.length / 32).ceil();
     var height = 18.0;
-    height += titleLines * 18 + 16;
+    height += 16 + 14;
     height += 14;
     if (entry.body.isNotEmpty) {
       height += bodyLines.clamp(1, 9999) * 14 + 8;

@@ -1,9 +1,12 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/book_entry_snapshot.dart';
 import '../models/book_order.dart';
 import '../models/daily_entry.dart';
+import '../services/photo_storage_service.dart';
 
 class BookOrderException implements Exception {
   BookOrderException(this.message);
@@ -15,9 +18,14 @@ class BookOrderException implements Exception {
 
 /// orders/{orderId} — 주문 + 일기 스냅샷
 class BookOrderService {
-  BookOrderService({FirebaseFirestore? db}) : _db = db ?? FirebaseFirestore.instance;
+  BookOrderService({
+    FirebaseFirestore? db,
+    PhotoStorageService? photos,
+  })  : _db = db ?? FirebaseFirestore.instance,
+        _photos = photos ?? PhotoStorageService();
 
   final FirebaseFirestore _db;
+  final PhotoStorageService _photos;
   final _uuid = const Uuid();
 
   CollectionReference<Map<String, dynamic>> get _orders =>
@@ -30,6 +38,58 @@ class BookOrderService {
     final sorted = List<DailyEntry>.from(entries)
       ..sort((a, b) => a.date.compareTo(b.date));
     return sorted.map(BookEntrySnapshot.fromEntry).toList();
+  }
+
+  /// 로컬 사진만 있고 Storage URL이 없으면 업로드 후 스냅샷 생성
+  Future<List<DailyEntry>> ensurePrintablePhotoEntries({
+    required String userId,
+    required List<DailyEntry> entries,
+  }) async {
+    final out = <DailyEntry>[];
+
+    for (final entry in entries) {
+      if (entry.localPhotoPaths.isEmpty) {
+        out.add(entry);
+        continue;
+      }
+
+      final remotes = List<String>.from(entry.remotePhotoUrls);
+      while (remotes.length < entry.localPhotoPaths.length) {
+        remotes.add('');
+      }
+
+      var changed = false;
+      for (var i = 0; i < entry.localPhotoPaths.length; i++) {
+        final existing = i < remotes.length ? remotes[i] : '';
+        if (existing.startsWith('http://') || existing.startsWith('https://')) {
+          continue;
+        }
+
+        final path = entry.localPhotoPaths[i];
+        if (path.startsWith('http://') || path.startsWith('https://')) {
+          remotes[i] = path;
+          changed = true;
+          continue;
+        }
+
+        final file = File(path);
+        if (!await file.exists()) continue;
+
+        final url = await _photos.uploadLocalPhoto(
+          file: file,
+          userId: userId,
+          date: entry.date,
+        );
+        if (url != null) {
+          remotes[i] = url;
+          changed = true;
+        }
+      }
+
+      out.add(changed ? entry.copyWith(remotePhotoUrls: remotes) : entry);
+    }
+
+    return out;
   }
 
   /// 선택 일기 → 스냅샷 → orders 문서 (status: pending_payment)
@@ -57,7 +117,11 @@ class BookOrderService {
       throw BookOrderException('받는 분 이름을 입력해 주세요.');
     }
 
-    final snapshots = buildSnapshots(entries);
+    final printableEntries = await ensurePrintablePhotoEntries(
+      userId: userId,
+      entries: entries,
+    );
+    final snapshots = buildSnapshots(printableEntries);
     final orderId = _uuid.v4();
     final bookId = 'book_${DateTime.now().millisecondsSinceEpoch}';
     final amount = hardcover ? hardcoverPrice : softcoverPrice;
