@@ -27,6 +27,7 @@ import '../models/user_preferences.dart';
 import '../core/utils/ai_narrative.dart';
 import '../core/utils/chapter_segmenter.dart';
 import '../core/utils/entry_diary_ai.dart';
+import '../core/utils/entry_photos.dart';
 import '../services/ai_journal_service.dart';
 import '../services/local_story_arc_service.dart';
 import '../services/story_arc_engine.dart';
@@ -695,12 +696,17 @@ class AppState extends ChangeNotifier {
 
     final existing = entryForDay(day);
     final previousLocal = existing?.localPhotoPaths ?? const [];
-    final localPaths = keepLocalPaths != null
+    var localPaths = keepLocalPaths != null
         ? List<String>.from(keepLocalPaths)
         : List<String>.from(previousLocal);
     if (newPhotoFiles.isNotEmpty) {
       localPaths.addAll(await _entries.savePhotosLocal(newPhotoFiles));
     }
+    localPaths = await EntryPhotos.persistLocalPaths(
+      localPaths: localPaths,
+      saveLocal: _entries.savePhotoLocal,
+    );
+    localPaths = localPaths.where((p) => p.isNotEmpty).toList();
     if (localPaths.length > DiaryLimits.maxPhotosPerEntry) {
       localPaths.removeRange(DiaryLimits.maxPhotosPerEntry, localPaths.length);
     }
@@ -708,7 +714,15 @@ class AppState extends ChangeNotifier {
     onStep?.call(RecordSaveStep.uploadingPhotos);
 
     List<String> remoteUrls;
-    if (keepRemoteUrls != null) {
+    if (keepRemoteUrls != null && keepLocalPaths != null) {
+      remoteUrls = List<String>.from(keepRemoteUrls);
+      while (remoteUrls.length < localPaths.length) {
+        remoteUrls.add('');
+      }
+      if (remoteUrls.length > localPaths.length) {
+        remoteUrls.removeRange(localPaths.length, remoteUrls.length);
+      }
+    } else if (keepRemoteUrls != null) {
       remoteUrls = List<String>.from(keepRemoteUrls);
       while (remoteUrls.length < localPaths.length) {
         remoteUrls.add('');

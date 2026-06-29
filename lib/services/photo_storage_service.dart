@@ -63,7 +63,14 @@ class PhotoStorageService {
       }
 
       final file = File(path);
-      if (!await file.exists()) continue;
+      if (!await file.exists()) {
+        if (urls[i].isEmpty &&
+            i < existingRemoteUrls.length &&
+            existingRemoteUrls[i].isNotEmpty) {
+          urls[i] = existingRemoteUrls[i];
+        }
+        continue;
+      }
 
       final url = await uploadLocalPhoto(file: file, userId: userId, date: date);
       if (url != null) {

@@ -76,13 +76,17 @@ class _RecordScreenState extends State<RecordScreen> {
 
   void _syncFromEntry(DailyEntry? entry) {
     if (entry == null) return;
+    final slots = EntryPhotos.editSlots(
+      localPaths: entry.localPhotoPaths,
+      remoteUrls: entry.remotePhotoUrls,
+    );
     setState(() {
       _syncedEntryId = entry.id;
       _moodEmoji = entry.moodEmoji;
       _moodLabel = entry.moodLabel;
       _noteController.text = entry.note ?? '';
-      _keptLocalPaths = List.from(entry.localPhotoPaths);
-      _keptRemoteUrls = List.from(entry.remotePhotoUrls);
+      _keptLocalPaths = slots.localPaths;
+      _keptRemoteUrls = slots.remoteUrls;
       _photosEdited = false;
       _newPhotoFiles.clear();
     });
@@ -138,9 +142,12 @@ class _RecordScreenState extends State<RecordScreen> {
       );
     }
     setState(() {
-      _photosEdited = true;
       _ensurePhotoEditState(entry);
+      _photosEdited = true;
       _keptLocalPaths.addAll(toAdd.map((f) => f.path));
+      while (_keptRemoteUrls.length < _keptLocalPaths.length) {
+        _keptRemoteUrls.add('');
+      }
     });
     _scheduleAiMoodSuggestions();
   }
@@ -188,8 +195,12 @@ class _RecordScreenState extends State<RecordScreen> {
 
   void _ensurePhotoEditState(DailyEntry? entry) {
     if (entry == null || _photosEdited) return;
-    _keptLocalPaths = List.from(entry.localPhotoPaths);
-    _keptRemoteUrls = List.from(entry.remotePhotoUrls);
+    final slots = EntryPhotos.editSlots(
+      localPaths: entry.localPhotoPaths,
+      remoteUrls: entry.remotePhotoUrls,
+    );
+    _keptLocalPaths = slots.localPaths;
+    _keptRemoteUrls = slots.remoteUrls;
   }
 
   List<String> _displayPhotoUris(DailyEntry? entry) {
@@ -345,8 +356,8 @@ class _RecordScreenState extends State<RecordScreen> {
 
   void _removeDisplayUri(String uri, DailyEntry? entry) {
     setState(() {
-      _photosEdited = true;
       _ensurePhotoEditState(entry);
+      _photosEdited = true;
 
       var removed = false;
       for (var i = 0; i < _keptLocalPaths.length; i++) {
@@ -388,8 +399,8 @@ class _RecordScreenState extends State<RecordScreen> {
     required DailyEntry? entry,
   }) {
     setState(() {
-      _photosEdited = true;
       _ensurePhotoEditState(entry);
+      _photosEdited = true;
 
       // displayUris 순서를 keptLocal/keptRemote 순서로 재정렬
       final pairs = <({int index, String uri})>[];
