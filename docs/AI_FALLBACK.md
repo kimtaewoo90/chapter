@@ -3,7 +3,8 @@
 > **목적:** Gemini API가 없거나 크레딧이 소진됐을 때 앱이 어떻게 동작하는지 추적·업데이트하기 위한 문서  
 > **마지막 갱신:** 2026-06-29  
 > **모델:** `gemini-2.0-flash` (`lib/core/config/ai_config.dart`)  
-> **키 설정:** `.env`의 `GEMINI_API_KEY` 또는 `--dart-define=GEMINI_API_KEY=...`
+> **키 설정:** `.env`의 `GEMINI_API_KEY` 또는 `--dart-define=GEMINI_API_KEY=...`  
+> **관련:** [STORY_MODEL.md](./STORY_MODEL.md) · [MONTHLY_REVIEW.md](./MONTHLY_REVIEW.md)
 
 ---
 
