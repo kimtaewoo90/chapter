@@ -152,7 +152,7 @@
 
 ### 10. 월간 리포트 (`generateMonthlyReview`)
 
-- **조건:** 최근 30일 기록 3장+
+- **조건 (현행):** 최근 30일 기록 3장+ — **목표 UX는 캘린더 월·말일 공개** → [MONTHLY_REVIEW.md](./MONTHLY_REVIEW.md)
 - **폴백:** `_fallbackMonthlyReview` — topic 빈도 상위 3개 라벨, 완성 Arc 제목, 고정 growth 문장
 - **키 없음 / API 실패:** 항상 폴백 리포트 생성 ✅
 
