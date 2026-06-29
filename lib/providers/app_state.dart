@@ -26,6 +26,7 @@ import '../models/today_weather.dart';
 import '../models/user_preferences.dart';
 import '../core/utils/ai_narrative.dart';
 import '../core/utils/chapter_segmenter.dart';
+import '../core/utils/monthly_review_period.dart';
 import '../core/utils/entry_diary_ai.dart';
 import '../core/utils/entry_photos.dart';
 import '../services/ai_journal_service.dart';
@@ -100,7 +101,8 @@ class AppState extends ChangeNotifier {
   ChapterSegment? openChapter;
   StoryArc? primaryActiveArc;
   DailyInsight? latestInsight;
-  MonthlyReview? monthlyReview;
+  List<MonthlyReview> archivedMonthlyReviews = [];
+  String? pendingMonthlyRevealPeriodKey;
   ChapterRevealPayload? pendingChapterReveal;
   ChapterWhisper? chapterWhisper;
   bool geminiConnected = false;
@@ -125,6 +127,30 @@ class AppState extends ChangeNotifier {
   int dailyReminderHour = DailyReminderDefaults.hour;
   int dailyReminderMinute = DailyReminderDefaults.minute;
   bool dailyReminderPermissionDenied = false;
+
+  String get currentMonthPeriodKey =>
+      MonthlyReviewPeriod.periodKeyFromDate(todayDate);
+
+  List<MonthlyReview> get revealedMonthlyReviews => archivedMonthlyReviews
+      .where((r) => r.wasRevealed)
+      .toList()
+    ..sort((a, b) => b.periodKey.compareTo(a.periodKey));
+
+  MonthlyReview? get pendingMonthlyReveal {
+    final key = pendingMonthlyRevealPeriodKey;
+    if (key == null) return null;
+    return monthlyReviewForPeriod(key);
+  }
+
+  MonthlyReview? monthlyReviewForPeriod(String periodKey) {
+    for (final r in archivedMonthlyReviews) {
+      if (r.periodKey == periodKey) return r;
+    }
+    return _storyArcs.monthlyReviewForPeriod(periodKey);
+  }
+
+  int get daysUntilMonthlyReview =>
+      MonthlyReviewPeriod.daysUntilMonthEnd(todayDate);
 
   DailyEntry? entryForDay(DateTime date) {
     for (final e in allEntries) {
@@ -293,7 +319,7 @@ class AppState extends ChangeNotifier {
       await _syncEntriesFromCloud(uid);
       await _loadChaptersFromCloud(uid);
     }
-    monthlyReview = _storyArcs.monthlyReview;
+    _reloadMonthlyReviewArchive();
     latestInsight = _storyArcs.dailyInsight;
     _refreshChapterWhisper(uid);
     final geminiIssue = AiConfig.geminiConfigIssue;
@@ -309,6 +335,7 @@ class AppState extends ChangeNotifier {
     initialized = true;
     launchPhase = _resolveLaunchPhase(prefs);
     notifyListeners();
+    await checkPendingMonthlyReviews();
   }
 
   LaunchPhase _resolveLaunchPhase(SharedPreferences prefs) {
@@ -1110,20 +1137,89 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<MonthlyReview?> refreshMonthlyReview() async {
+  Future<MonthlyReview?> refreshMonthlyReview() => syncMonthlyReviewArchive();
+
+  void _reloadMonthlyReviewArchive() {
+    archivedMonthlyReviews = _storyArcs.monthlyReviewArchive;
+  }
+
+  /// 말일·미생성 월 리포트 생성 및 reveal 대기 설정
+  Future<void> checkPendingMonthlyReviews() async {
+    final uid = _localUid;
+    if (uid == null) return;
+
+    _reloadMonthlyReviewArchive();
+    final today = todayDate;
+    final knownKeys = archivedMonthlyReviews.map((r) => r.periodKey).toSet();
+    String? revealCandidate;
+
+    for (final monthStart
+        in MonthlyReviewPeriod.monthsSpanningEntries(allEntries, today)) {
+      final year = monthStart.year;
+      final month = monthStart.month;
+      final periodKey = MonthlyReviewPeriod.periodKey(year, month);
+
+      if (!MonthlyReviewPeriod.isEligibleForGeneration(
+        year: year,
+        month: month,
+        today: today,
+      )) {
+        continue;
+      }
+
+      if (knownKeys.contains(periodKey)) {
+        final existing = monthlyReviewForPeriod(periodKey);
+        if (existing != null && !existing.wasRevealed) {
+          revealCandidate = periodKey;
+        }
+        continue;
+      }
+
+      final review = await _storyArcEngine.generateMonthlyReviewForPeriod(
+        uid: uid,
+        year: year,
+        month: month,
+        allEntries: allEntries,
+      );
+      if (review != null) {
+        knownKeys.add(periodKey);
+        revealCandidate = periodKey;
+        _reloadMonthlyReviewArchive();
+      }
+    }
+
+    if (revealCandidate != null) {
+      pendingMonthlyRevealPeriodKey = revealCandidate;
+      notifyListeners();
+    }
+  }
+
+  Future<MonthlyReview?> syncMonthlyReviewArchive() async {
     final uid = _localUid;
     if (uid == null) return null;
     if (cloudSyncEnabled) {
       await _storyArcs.refreshFromCloud(uid);
       await _syncEntriesFromCloud(uid);
     }
-    final review = await _storyArcEngine.generateMonthlyReview(
-      uid: uid,
-      allEntries: allEntries,
-    );
-    monthlyReview = review;
+    _reloadMonthlyReviewArchive();
+    await checkPendingMonthlyReviews();
     notifyListeners();
-    return review;
+    return pendingMonthlyReveal ??
+        (revealedMonthlyReviews.isNotEmpty ? revealedMonthlyReviews.first : null);
+  }
+
+  Future<void> dismissMonthlyReveal() async {
+    final key = pendingMonthlyRevealPeriodKey;
+    if (key != null) {
+      await _storyArcs.markMonthlyReviewRevealed(key);
+      _reloadMonthlyReviewArchive();
+    }
+    pendingMonthlyRevealPeriodKey = null;
+    notifyListeners();
+  }
+
+  void clearMonthlyReveal() {
+    dismissMonthlyReveal();
   }
 
   List<File> _photoFilesForAi(List<String> localPaths) {

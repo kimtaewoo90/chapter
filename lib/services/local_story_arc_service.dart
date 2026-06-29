@@ -29,7 +29,7 @@ class LocalStoryArcService {
   late final StreamController<List<StoryArc>> _arcsController;
   List<StoryArc>? _cachedArcs;
   List<StoryArcMapping>? _cachedMappings;
-  MonthlyReview? _cachedReview;
+  List<MonthlyReview> _cachedReviews = [];
   DailyInsight? _cachedInsight;
   DateTime? _lastDiscoveryAt;
   Set<String> _whisperShownArcIds = {};
@@ -39,6 +39,7 @@ class LocalStoryArcService {
 
   static const _arcsKey = 'story_arcs';
   static const _mappingsKey = 'story_arc_mappings';
+  static const _reviewsArchiveKey = 'monthly_reviews_archive';
   static const _reviewKey = 'monthly_review';
   static const _insightKey = 'daily_insight';
   static const _discoveryKey = 'story_arc_last_discovery';
@@ -121,7 +122,23 @@ class LocalStoryArcService {
         .toList();
   }
 
-  MonthlyReview? get monthlyReview => _cachedReview;
+  List<MonthlyReview> get monthlyReviewArchive {
+    final list = [..._cachedReviews]
+      ..sort((a, b) => b.periodKey.compareTo(a.periodKey));
+    return list;
+  }
+
+  MonthlyReview? monthlyReviewForPeriod(String periodKey) {
+    for (final r in _cachedReviews) {
+      if (r.periodKey == periodKey) return r;
+    }
+    return null;
+  }
+
+  /// @deprecated — [monthlyReviewArchive] 사용
+  MonthlyReview? get monthlyReview =>
+      _cachedReviews.isEmpty ? null : monthlyReviewArchive.first;
+
   DailyInsight? get dailyInsight => _cachedInsight;
   DateTime? get lastDiscoveryAt => _lastDiscoveryAt;
 
@@ -147,12 +164,30 @@ class LocalStoryArcService {
     await _syncMappingToCloud(mapping);
   }
 
-  Future<void> saveMonthlyReview(MonthlyReview review) async {
-    _cachedReview = review;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_reviewKey, jsonEncode(review.toJson()));
-    await _syncMetaToCloud(monthlyReview: review);
+  Future<void> upsertMonthlyReview(MonthlyReview review) async {
+    await _ensureLoaded();
+    final idx = _cachedReviews.indexWhere((r) => r.periodKey == review.periodKey);
+    if (idx >= 0) {
+      _cachedReviews[idx] = review;
+    } else {
+      _cachedReviews.add(review);
+    }
+    await _persistReviews();
+    await _syncMetaToCloud(monthlyReviews: _cachedReviews);
   }
+
+  Future<void> markMonthlyReviewRevealed(String periodKey) async {
+    await _ensureLoaded();
+    final idx = _cachedReviews.indexWhere((r) => r.periodKey == periodKey);
+    if (idx < 0) return;
+    _cachedReviews[idx] = _cachedReviews[idx].copyWith(revealedAt: DateTime.now());
+    await _persistReviews();
+    await _syncMetaToCloud(monthlyReviews: _cachedReviews);
+  }
+
+  /// @deprecated — [upsertMonthlyReview] 사용
+  Future<void> saveMonthlyReview(MonthlyReview review) =>
+      upsertMonthlyReview(review);
 
   Future<void> saveDailyInsight(DailyInsight insight) async {
     _cachedInsight = insight;
@@ -216,18 +251,24 @@ class LocalStoryArcService {
         lastDiscoveryAt: _lastDiscoveryAt,
         whisperShownArcIds: _whisperShownArcIds,
         dailyInsight: _cachedInsight,
-        monthlyReview: _cachedReview,
+        monthlyReviews: _cachedReviews,
       );
 
   Future<void> _applyBundle(String uid, StoryArcBundle bundle) async {
+    await _ensureLoaded();
     _cachedArcs = bundle.arcs;
     _cachedMappings = bundle.mappings;
     _lastDiscoveryAt = bundle.lastDiscoveryAt;
     _whisperShownArcIds = bundle.whisperShownArcIds;
     _cachedInsight = bundle.dailyInsight;
-    _cachedReview = bundle.monthlyReview;
+    if (bundle.monthlyReviews.isNotEmpty) {
+      _cachedReviews = _mergeReviewArchives(_cachedReviews, bundle.monthlyReviews);
+    } else if (bundle.monthlyReview != null) {
+      _cachedReviews = _mergeReviewArchives(_cachedReviews, [bundle.monthlyReview!]);
+    }
     await _persistArcs();
     await _persistMappings();
+    await _persistReviews();
     final prefs = await SharedPreferences.getInstance();
     if (bundle.lastDiscoveryAt != null) {
       await prefs.setString(_discoveryKey, bundle.lastDiscoveryAt!.toIso8601String());
@@ -236,10 +277,29 @@ class LocalStoryArcService {
     if (bundle.dailyInsight != null) {
       await prefs.setString(_insightKey, jsonEncode(bundle.dailyInsight!.toJson()));
     }
-    if (bundle.monthlyReview != null) {
-      await prefs.setString(_reviewKey, jsonEncode(bundle.monthlyReview!.toJson()));
-    }
     _emit(uid);
+  }
+
+  List<MonthlyReview> _mergeReviewArchives(
+    List<MonthlyReview> local,
+    List<MonthlyReview> remote,
+  ) {
+    final byKey = {for (final r in local) r.periodKey: r};
+    for (final r in remote) {
+      final existing = byKey[r.periodKey];
+      if (existing == null) {
+        byKey[r.periodKey] = r;
+      } else {
+        final keepLocal = existing.generatedAt.isAfter(r.generatedAt);
+        byKey[r.periodKey] = keepLocal ? existing : r;
+        if (existing.wasRevealed && !r.wasRevealed) {
+          byKey[r.periodKey] = existing;
+        } else if (r.wasRevealed && !existing.wasRevealed) {
+          byKey[r.periodKey] = r;
+        }
+      }
+    }
+    return byKey.values.toList();
   }
 
   Future<void> _syncArcToCloud(StoryArc arc) async {
@@ -265,6 +325,7 @@ class LocalStoryArcService {
     Set<String>? whisperShownArcIds,
     DailyInsight? dailyInsight,
     MonthlyReview? monthlyReview,
+    List<MonthlyReview>? monthlyReviews,
   }) async {
     if (!_cloudSyncEnabled || _currentUid == null) return;
     try {
@@ -274,6 +335,7 @@ class LocalStoryArcService {
         whisperShownArcIds: whisperShownArcIds,
         dailyInsight: dailyInsight,
         monthlyReview: monthlyReview,
+        monthlyReviews: monthlyReviews ?? _cachedReviews,
       );
     } catch (e, st) {
       debugPrint('LocalStoryArcService: saveMeta cloud failed — $e\n$st');
@@ -298,10 +360,21 @@ class LocalStoryArcService {
             .map((e) => StoryArcMapping.fromJson(Map<String, dynamic>.from(e as Map)))
             .toList();
 
-    final reviewRaw = prefs.getString(_reviewKey);
-    _cachedReview = reviewRaw == null
-        ? null
-        : MonthlyReview.fromJson(Map<String, dynamic>.from(jsonDecode(reviewRaw) as Map));
+    final reviewArchiveRaw = prefs.getString(_reviewsArchiveKey);
+    if (reviewArchiveRaw != null) {
+      _cachedReviews = (jsonDecode(reviewArchiveRaw) as List)
+          .map((e) => MonthlyReview.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    } else {
+      final legacyRaw = prefs.getString(_reviewKey);
+      if (legacyRaw != null) {
+        _cachedReviews = [
+          MonthlyReview.fromJson(Map<String, dynamic>.from(jsonDecode(legacyRaw) as Map)),
+        ];
+        await _persistReviews();
+        await prefs.remove(_reviewKey);
+      }
+    }
 
     final insightRaw = prefs.getString(_insightKey);
     _cachedInsight = insightRaw == null
@@ -322,6 +395,14 @@ class LocalStoryArcService {
   Future<void> _persistMappings() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_mappingsKey, jsonEncode(_cachedMappings!.map((m) => m.toJson()).toList()));
+  }
+
+  Future<void> _persistReviews() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _reviewsArchiveKey,
+      jsonEncode(_cachedReviews.map((r) => r.toJson()).toList()),
+    );
   }
 
   void _emit(String uid) {

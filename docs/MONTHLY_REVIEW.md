@@ -2,7 +2,7 @@
 
 > **목적:** 월간 리포트의 목표 UX·엣지 케이스·구현 단계를 추적하기 위한 문서  
 > **마지막 갱신:** 2026-06-29  
-> **상태:** 스펙 확정 전 (코드 미반영)  
+> **상태:** Phase 1 코드 반영 (2026-06-29) — 로컬 알림·백엔드는 미구현  
 > **관련:** [STORY_MODEL.md](./STORY_MODEL.md) · [AI_FALLBACK.md](./AI_FALLBACK.md) §10 월간 리포트
 
 ---
@@ -269,12 +269,12 @@ entriesInMonth(period) >= 3
 
 ### Phase 1 — 앱만 (MVP)
 
-- [ ] `periodKey` + 아카이브 리스트
-- [ ] 말일/이후 첫 실행 시 생성
-- [ ] `pendingMonthlyReveal` + reveal 오버레이
-- [ ] 화면: 과거 리스트만 + 이번 달 힌트
-- [ ] `refreshMonthlyReview` 즉시 재생성 제거
-- [ ] 단일 `monthlyReview` → 아카이브 마이그레이션
+- [x] `periodKey` + 아카이브 리스트
+- [x] 말일/이후 첫 실행 시 생성
+- [x] `pendingMonthlyReveal` + reveal 오버레이
+- [x] 화면: 과거 리스트만 + 이번 달 힌트
+- [x] `refreshMonthlyReview` 즉시 재생성 제거
+- [x] 단일 `monthlyReview` → 아카이브 마이그레이션
 
 ### Phase 2 — 로컬 알림
 

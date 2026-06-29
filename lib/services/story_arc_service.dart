@@ -17,6 +17,7 @@ class StoryArcBundle {
     this.whisperShownArcIds = const {},
     this.dailyInsight,
     this.monthlyReview,
+    this.monthlyReviews = const [],
   });
 
   final List<StoryArc> arcs;
@@ -24,7 +25,9 @@ class StoryArcBundle {
   final DateTime? lastDiscoveryAt;
   final Set<String> whisperShownArcIds;
   final DailyInsight? dailyInsight;
+  /// @deprecated — [monthlyReviews] 사용
   final MonthlyReview? monthlyReview;
+  final List<MonthlyReview> monthlyReviews;
 
   bool get isEmpty => arcs.isEmpty && mappings.isEmpty;
 }
@@ -61,6 +64,7 @@ class StoryArcService {
     Set<String> whisperShownArcIds = {};
     DailyInsight? dailyInsight;
     MonthlyReview? monthlyReview;
+    var monthlyReviews = <MonthlyReview>[];
 
     if (metaSnap.exists) {
       final d = metaSnap.data()!;
@@ -77,9 +81,18 @@ class StoryArcService {
       if (insightRaw is Map) {
         dailyInsight = DailyInsight.fromJson(Map<String, dynamic>.from(insightRaw));
       }
+      final reviewsRaw = d['monthlyReviews'];
+      if (reviewsRaw is List) {
+        monthlyReviews = reviewsRaw
+            .map((e) => MonthlyReview.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+      }
       final reviewRaw = d['monthlyReview'];
       if (reviewRaw is Map) {
         monthlyReview = MonthlyReview.fromJson(Map<String, dynamic>.from(reviewRaw));
+        if (monthlyReviews.isEmpty && monthlyReview != null) {
+          monthlyReviews = [monthlyReview!];
+        }
       }
     }
 
@@ -90,6 +103,7 @@ class StoryArcService {
       whisperShownArcIds: whisperShownArcIds,
       dailyInsight: dailyInsight,
       monthlyReview: monthlyReview,
+      monthlyReviews: monthlyReviews,
     );
   }
 
@@ -119,6 +133,7 @@ class StoryArcService {
     Set<String>? whisperShownArcIds,
     DailyInsight? dailyInsight,
     MonthlyReview? monthlyReview,
+    List<MonthlyReview>? monthlyReviews,
   }) async {
     final data = <String, dynamic>{
       'updatedAt': FieldValue.serverTimestamp(),
@@ -132,7 +147,9 @@ class StoryArcService {
     if (dailyInsight != null) {
       data['dailyInsight'] = dailyInsight.toJson();
     }
-    if (monthlyReview != null) {
+    if (monthlyReviews != null) {
+      data['monthlyReviews'] = monthlyReviews.map((r) => r.toJson()).toList();
+    } else if (monthlyReview != null) {
       data['monthlyReview'] = monthlyReview.toJson();
     }
     await _meta(uid).set(data, SetOptions(merge: true));
@@ -162,7 +179,9 @@ class StoryArcService {
       lastDiscoveryAt: bundle.lastDiscoveryAt,
       whisperShownArcIds: bundle.whisperShownArcIds,
       dailyInsight: bundle.dailyInsight,
-      monthlyReview: bundle.monthlyReview,
+      monthlyReviews: bundle.monthlyReviews.isNotEmpty
+          ? bundle.monthlyReviews
+          : (bundle.monthlyReview != null ? [bundle.monthlyReview!] : null),
     );
   }
 }

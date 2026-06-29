@@ -9,6 +9,7 @@ import '../models/story_arc_status.dart';
 import '../core/utils/ai_narrative.dart';
 import '../core/utils/chapter_segmenter.dart';
 import '../core/utils/journal_analysis_fallback.dart';
+import '../core/utils/monthly_review_period.dart';
 import '../models/chapter_moment.dart';
 import '../core/config/ai_config.dart';
 import 'ai_journal_service.dart';
@@ -119,24 +120,56 @@ class StoryArcEngine {
     return arc.lastEntryDate!.difference(arc.firstEntryDate!).inDays;
   }
 
-  Future<MonthlyReview?> generateMonthlyReview({
+  Future<MonthlyReview?> generateMonthlyReviewForPeriod({
     required String uid,
+    required int year,
+    required int month,
     required List<DailyEntry> allEntries,
   }) async {
-    final window = _entriesInLastDays(allEntries, 30);
-    if (window.length < 3) return null;
+    final window = MonthlyReviewPeriod.entriesInMonth(
+      allEntries,
+      year: year,
+      month: month,
+    );
+    if (window.length < MonthlyReviewPeriod.minEntriesToGenerate) return null;
 
+    final periodKey = MonthlyReviewPeriod.periodKey(year, month);
+    final periodLabel = MonthlyReviewPeriod.periodLabel(year, month);
     final arcs = _arcs.arcsForUser(uid);
+
     final review = await _ai.generateMonthlyReview(
       entries: window,
       storyArcs: arcs,
     );
 
-    final resolved = review ??
-        _fallbackMonthlyReview(window, arcs);
+    final resolved = (review ??
+            _fallbackMonthlyReview(
+              window,
+              arcs,
+              periodLabel: periodLabel,
+            ))
+        .copyWith(
+      periodKey: periodKey,
+      periodLabel: periodLabel,
+      generatedAt: DateTime.now(),
+    );
 
-    await _arcs.saveMonthlyReview(resolved);
+    await _arcs.upsertMonthlyReview(resolved);
     return resolved;
+  }
+
+  /// @deprecated — [generateMonthlyReviewForPeriod] 사용
+  Future<MonthlyReview?> generateMonthlyReview({
+    required String uid,
+    required List<DailyEntry> allEntries,
+  }) async {
+    final now = DateTime.now();
+    return generateMonthlyReviewForPeriod(
+      uid: uid,
+      year: now.year,
+      month: now.month,
+      allEntries: allEntries,
+    );
   }
 
   /// Story Arc 자동 완성 — 사용자 UI 없이 백그라운드
@@ -429,7 +462,11 @@ class StoryArcEngine {
     return '$topic 주제의 하루가 남았어요.';
   }
 
-  MonthlyReview _fallbackMonthlyReview(List<DailyEntry> window, List<StoryArc> arcs) {
+  MonthlyReview _fallbackMonthlyReview(
+    List<DailyEntry> window,
+    List<StoryArc> arcs, {
+    required String periodLabel,
+  }) {
     final topicCounts = <String, int>{};
     for (final e in window) {
       for (final t in e.topics) {
@@ -447,11 +484,13 @@ class StoryArcEngine {
         .toList();
 
     return MonthlyReview(
+      periodKey: MonthlyReviewPeriod.periodKeyFromDate(window.first.date),
+      periodLabel: periodLabel,
       generatedAt: DateTime.now(),
       topTopics: labels,
       summary: labels.isEmpty
-          ? '최근 ${window.length}일의 순간이 쌓였어요.'
-          : '최근 한 달, ${labels.join(' · ')} 이야기가 두드러졌어요.',
+          ? '$periodLabel, ${window.length}일의 순간이 쌓였어요.'
+          : '$periodLabel, ${labels.join(' · ')} 이야기가 두드러졌어요.',
       growth: '꾸준히 기록하며 자신만의 이야기를 쌓고 있어요.',
       chapterChanges: changes,
     );

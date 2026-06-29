@@ -80,9 +80,7 @@ class MoreScreen extends StatelessWidget {
             _MoreTile(
               icon: Icons.insights_outlined,
               title: '월간 리포트',
-              subtitle: state.monthlyReview != null
-                  ? '최근 30일 Story Arc 요약'
-                  : '주제·감정·성장 포인트',
+              subtitle: _monthlyReviewSubtitle(state),
               onTap: () => Navigator.push(
                 context,
                 analyticsPageRoute(
@@ -337,4 +335,15 @@ class _StatsCard extends StatelessWidget {
       ],
     );
   }
+}
+
+String _monthlyReviewSubtitle(AppState state) {
+  if (state.pendingMonthlyReveal != null) {
+    return '새 리포트가 도착했어요';
+  }
+  final count = state.revealedMonthlyReviews.length;
+  if (count > 0) {
+    return '지난 리포트 $count개';
+  }
+  return '말일에 이번 달 이야기가 열려요';
 }

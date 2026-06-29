@@ -396,6 +396,8 @@ $lines
     if (map == null) return null;
 
     return MonthlyReview(
+      periodKey: '',
+      periodLabel: '',
       generatedAt: DateTime.now(),
       topTopics: (map['top_topics'] as List<dynamic>?)
               ?.map((e) => e.toString())
