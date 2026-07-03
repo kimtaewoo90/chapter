@@ -6,6 +6,7 @@ import '../core/analytics/analytics_route_observer.dart';
 import '../core/theme/app_theme.dart';
 import '../providers/app_state.dart';
 import '../services/analytics_service.dart';
+import '../screens/update/app_version_block_screen.dart';
 import '../screens/splash/splash_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/main_shell.dart';
@@ -62,6 +63,10 @@ class _LaunchPhaseTrackerState extends State<_LaunchPhaseTracker> {
             analytics.logScreenView(screenName: 'onboarding');
           case LaunchPhase.home:
             analytics.logScreenView(screenName: 'home');
+          case LaunchPhase.forceUpdate:
+            analytics.logScreenView(screenName: 'force_update');
+          case LaunchPhase.maintenance:
+            analytics.logScreenView(screenName: 'maintenance');
           case LaunchPhase.initializing:
             break;
         }
@@ -87,6 +92,13 @@ class _AppRouter extends StatelessWidget {
 
     return _LaunchPhaseTracker(
       child: switch (state.launchPhase) {
+        LaunchPhase.forceUpdate || LaunchPhase.maintenance => AppVersionBlockScreen(
+            gate: state.versionGate!,
+            onRetry: () => state.retryVersionCheck(),
+            onOpenStore: state.launchPhase == LaunchPhase.forceUpdate
+                ? () => context.read<AnalyticsService>().logForceUpdateStoreTap()
+                : null,
+          ),
         LaunchPhase.splash => SplashScreen(onDone: () => state.finishSplash()),
         LaunchPhase.onboarding => const OnboardingScreen(),
         LaunchPhase.home => const MainShell(),

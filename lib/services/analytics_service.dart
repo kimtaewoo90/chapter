@@ -197,6 +197,8 @@ class AnalyticsService {
         parameters: {'connected': connected},
       );
 
+  Future<void> logForceUpdateStoreTap() => logEvent('force_update_store_tap');
+
   Future<void> setUserProperty(String name, String? value) async {
     if (!_ready || _analytics == null) return;
     if (value == null || value.isEmpty) return;

@@ -13,6 +13,7 @@ import '../core/constants/daily_reminder_defaults.dart';
 import '../core/constants/dev_flags.dart';
 import '../core/constants/moods.dart';
 import '../core/config/weather_config.dart';
+import '../models/app_version_gate.dart';
 import '../models/chapter_moment.dart';
 import '../models/chapter_model.dart';
 import '../core/constants/diary_limits.dart';
@@ -34,6 +35,7 @@ import '../services/local_story_arc_service.dart';
 import '../services/story_arc_engine.dart';
 import '../services/mood_profile_service.dart';
 import '../services/local_chapter_service.dart';
+import '../services/app_version_service.dart';
 import '../services/auth_link_exception.dart';
 import '../services/auth_service.dart';
 import '../services/daily_reminder_service.dart';
@@ -43,8 +45,15 @@ import '../services/local_entry_service.dart';
 import '../services/photo_storage_service.dart';
 import '../services/weather_service.dart';
 
-/// 앱 첫 진입 흐름: 스플래시 → 온보딩 → 홈
-enum LaunchPhase { initializing, splash, onboarding, home }
+/// 앱 첫 진입 흐름: 버전 게이트 → 스플래시 → 온보딩 → 홈
+enum LaunchPhase {
+  initializing,
+  forceUpdate,
+  maintenance,
+  splash,
+  onboarding,
+  home,
+}
 
 class AppState extends ChangeNotifier {
   AppState({
@@ -59,6 +68,7 @@ class AppState extends ChangeNotifier {
     WeatherService? weather,
     DailyReminderService? dailyReminder,
     StoryArcEngine? storyArcEngine,
+    AppVersionService? appVersion,
   })  : _entries = entries,
         _chapters = chapters,
         _storyArcs = storyArcs,
@@ -73,7 +83,8 @@ class AppState extends ChangeNotifier {
             StoryArcEngine(
               arcs: storyArcs,
               ai: aiJournal ?? AiJournalService(),
-            );
+            ),
+        _appVersion = appVersion ?? AppVersionService();
 
   final LocalEntryService _entries;
   final LocalChapterService _chapters;
@@ -86,9 +97,12 @@ class AppState extends ChangeNotifier {
   final WeatherService _weather;
   final DailyReminderService _dailyReminder;
   final StoryArcEngine _storyArcEngine;
+  final AppVersionService _appVersion;
 
   bool initialized = false;
   LaunchPhase launchPhase = LaunchPhase.initializing;
+  AppVersionGateResult? versionGate;
+  String appBuildLabel = '';
   bool onboardingComplete = false;
   AppFontId fontId = kDefaultFontId;
   AppFontId diaryFontId = kDefaultDiaryFontId;
@@ -273,6 +287,49 @@ class AppState extends ChangeNotifier {
 
   Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
+
+    try {
+      appBuildLabel = await _appVersion.currentBuildLabel();
+    } catch (e, st) {
+      debugPrint('PackageInfo skipped: $e\n$st');
+    }
+
+    final gate = await _appVersion.evaluate();
+    if (gate.isBlocked) {
+      versionGate = gate;
+      initialized = true;
+      launchPhase = gate.blockReason == VersionBlockReason.maintenance
+          ? LaunchPhase.maintenance
+          : LaunchPhase.forceUpdate;
+      notifyListeners();
+      return;
+    }
+
+    versionGate = null;
+    await _completeInitialize(prefs);
+  }
+
+  /// 업데이트·점검 화면에서 Remote Config 재확인
+  Future<void> retryVersionCheck() async {
+    launchPhase = LaunchPhase.initializing;
+    notifyListeners();
+
+    final gate = await _appVersion.evaluate(forceFetch: true);
+    if (gate.isBlocked) {
+      versionGate = gate;
+      launchPhase = gate.blockReason == VersionBlockReason.maintenance
+          ? LaunchPhase.maintenance
+          : LaunchPhase.forceUpdate;
+      notifyListeners();
+      return;
+    }
+
+    versionGate = null;
+    final prefs = await SharedPreferences.getInstance();
+    await _completeInitialize(prefs);
+  }
+
+  Future<void> _completeInitialize(SharedPreferences prefs) async {
     final savedOnboarding = prefs.getBool('onboarding_complete') ?? false;
     onboardingComplete = kPreviewOnboardingOnEveryRestart ? false : savedOnboarding;
     fontId = appFontIdFromKey(prefs.getString('app_font_id'));

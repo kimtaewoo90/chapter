@@ -153,6 +153,16 @@ class MoreScreen extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 28),
+            Center(
+              child: Text(
+                state.appBuildLabel.isEmpty ? 'CHAPTER' : 'CHAPTER ${state.appBuildLabel}',
+                style: textTheme.bodySmall?.copyWith(
+                  color: AppTheme.inkMuted.withValues(alpha: 0.55),
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
             if (total > 0) ...[
               const SizedBox(height: 28),
               _SectionLabel('감정 분포'),

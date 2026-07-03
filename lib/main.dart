@@ -12,6 +12,7 @@ import 'core/firebase_bootstrap.dart';
 import 'firebase_options.dart';
 import 'providers/app_state.dart';
 import 'services/analytics_service.dart';
+import 'services/app_version_service.dart';
 import 'services/chapter_service.dart';
 import 'services/entry_service.dart';
 import 'services/local_chapter_service.dart';
@@ -69,6 +70,7 @@ class ChapterRoot extends StatelessWidget {
         Provider(create: (_) => PhotoStorageService()),
         Provider(create: (_) => EntryService()),
         Provider(create: (_) => ChapterService()),
+        Provider(create: (_) => AppVersionService()),
         ChangeNotifierProvider(
           create: (ctx) => AppState(
             entries: ctx.read<LocalEntryService>(),
@@ -77,6 +79,7 @@ class ChapterRoot extends StatelessWidget {
             photos: ctx.read<PhotoStorageService>(),
             cloudEntries: ctx.read<EntryService>(),
             cloudChapters: ctx.read<ChapterService>(),
+            appVersion: ctx.read<AppVersionService>(),
           )..initialize(),
         ),
       ],

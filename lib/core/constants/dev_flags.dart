@@ -12,3 +12,10 @@ const bool kEnableAppleSignIn = bool.fromEnvironment(
   'ENABLE_APPLE_SIGN_IN',
   defaultValue: true,
 );
+
+/// 디버그에서 Remote Config 최소 버전 게이트 우회 — `--dart-define=BYPASS_VERSION_GATE=true`
+const bool kBypassVersionGate = kDebugMode &&
+    bool.fromEnvironment(
+      'BYPASS_VERSION_GATE',
+      defaultValue: false,
+    );
