@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'book_layout_types.dart';
 import 'book_pdf_diary_block.dart';
+import 'book_pdf_photo_meta.dart';
 import 'book_photo_style.dart';
 import 'book_pdf_style.dart';
 import 'book_sticker_collage.dart';
@@ -11,30 +12,43 @@ class BookPdfLayoutMetrics {
   BookPdfLayoutMetrics._();
 
   /// Flutter 텍스트/박스 vs 추정 오차 흡수
-  static const pageSafetyMargin = 8.0;
+  static const pageSafetyMargin = 16.0;
 
   static double headerBlockHeight(BookDiaryEntry entry) {
     if (entry.date.isEmpty) return BookPdfStyle.headerBottomGap;
     return BookPdfStyle.dateSize * 1.2 +
         BookPdfStyle.dateGap +
         0.5 +
-        BookPdfStyle.headerBottomGap;
+        BookPdfStyle.headerBottomGap +
+        2;
   }
 
-  static double photoBlockHeight(BookDiaryEntry entry) {
+  static double photoCollageHeight(BookDiaryEntry entry) {
     if (entry.photoCount == 0) return 0;
 
     final innerWidth = BookEntryBoxStyle.photoInnerWidth(BookPdfPageSpec.contentWidth);
     final maxLong = entry.photoCount == 1
         ? BookPhotoFrameStyle.maxLongSingle
         : BookPhotoFrameStyle.maxLongMulti;
-    final collageHeight = BookStickerCollage.estimateCollageHeight(
-      entry.photoCount,
-      innerWidth,
-      maxLong,
-    );
 
-    return collageHeight + BookEntryBoxStyle.pad * 2 + BookEntryBoxStyle.sectionGap;
+    final stickerItems = List.generate(entry.photoCount, (i) {
+      final uri = i < entry.photoUris.length ? entry.photoUris[i] : '';
+      final meta = BookPdfPhotoMeta.cached(uri) ?? BookPdfPhotoMeta.fallback;
+      return BookStickerItem(index: i, meta: meta);
+    });
+
+    return BookStickerCollage.layoutStickerCollage(
+      stickerItems,
+      innerWidth,
+      options: BookStickerCollageOptions(maxLongEdge: maxLong),
+    ).totalHeight;
+  }
+
+  static double photoBlockHeight(BookDiaryEntry entry) {
+    if (entry.photoCount == 0) return 0;
+    return photoCollageHeight(entry) +
+        BookEntryBoxStyle.pad * 2 +
+        BookEntryBoxStyle.sectionGap;
   }
 
   static TextStyle textStyleForPlan(BookLayoutPlan plan) {
@@ -82,7 +96,8 @@ class BookPdfLayoutMetrics {
 
     final minHeight = minLines * BookEntryBoxStyle.ruleSpacing + BookEntryBoxStyle.pad * 2;
     final contentHeight = painter.size.height + BookEntryBoxStyle.pad * 2 + 4;
-    return contentHeight > minHeight ? contentHeight : minHeight;
+    final height = contentHeight > minHeight ? contentHeight : minHeight;
+    return height.ceilToDouble() + 1;
   }
 
   static double textBlockHeight(

@@ -1,12 +1,11 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import '../core/book_layout/book_layout_types.dart';
 import '../core/book_layout/book_photo_style.dart';
-import '../core/book_layout/book_pdf_layout_metrics.dart';
 import '../core/book_layout/book_pdf_diary_block.dart';
+import '../core/book_layout/book_pdf_layout_metrics.dart';
 import '../core/book_layout/book_pdf_page_planner.dart';
+import '../core/book_layout/book_pdf_photo_meta.dart';
 import '../core/book_layout/book_pdf_style.dart';
 import '../core/book_layout/book_preview_entry_mapper.dart';
 import '../core/book_layout/book_sticker_collage.dart';
@@ -15,7 +14,7 @@ import '../models/book_entry_snapshot.dart';
 import '../models/daily_entry.dart';
 import 'book_pdf_calendar_page.dart';
 import 'book_pdf_notebook_box.dart';
-import 'entry_photo.dart';
+import 'book_pdf_photo_tile.dart';
 
 /// chapter_admin PDF generator와 동일 레이아웃의 책 미리보기
 class BookPdfPreview extends StatefulWidget {
@@ -59,16 +58,29 @@ class BookPdfPreview extends StatefulWidget {
 class _BookPdfPreviewState extends State<BookPdfPreview> {
   late final PageController _controller;
   int _pageIndex = 0;
-
-  late final List<BookPdfPreviewPage> _pages = BookPdfPreviewPlanner.plan(
-    entries: widget.diaryEntries,
-    bookTitle: widget.bookTitle,
-  );
+  List<BookPdfPreviewPage> _pages = const [];
+  bool _pagesReady = false;
 
   @override
   void initState() {
     super.initState();
     _controller = PageController();
+    _loadPages();
+  }
+
+  Future<void> _loadPages() async {
+    final uris = widget.diaryEntries
+        .expand((entry) => entry.photoUris)
+        .where((uri) => uri.isNotEmpty);
+    await BookPdfPhotoMeta.preload(uris);
+    if (!mounted) return;
+    setState(() {
+      _pages = BookPdfPreviewPlanner.plan(
+        entries: widget.diaryEntries,
+        bookTitle: widget.bookTitle,
+      );
+      _pagesReady = true;
+    });
   }
 
   @override
@@ -79,6 +91,31 @@ class _BookPdfPreviewState extends State<BookPdfPreview> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_pagesReady) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AspectRatio(
+            aspectRatio: BookPdfPageSpec.width / BookPdfPageSpec.height,
+            child: Center(
+              child: CircularProgressIndicator(
+                color: AppTheme.inkMuted.withValues(alpha: 0.5),
+                strokeWidth: 2,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '미리보기 준비 중…',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppTheme.inkMuted,
+                ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -276,9 +313,13 @@ class _BookPdfDiaryPage extends StatelessWidget {
           height: BookPdfStyle.pageContentHeight,
           width: BookPdfPageSpec.contentWidth,
           child: ClipRect(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+            child: OverflowBox(
+              alignment: Alignment.topCenter,
+              maxHeight: double.infinity,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                 for (final block in blocks)
                   switch (block) {
                     BookDiaryEntryGapBlock() =>
@@ -300,7 +341,8 @@ class _BookPdfDiaryPage extends StatelessWidget {
                         ),
                       ),
                   },
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -361,10 +403,65 @@ class _BookPdfEntryHeader extends StatelessWidget {
   }
 }
 
-class _BookPdfPhotoSection extends StatelessWidget {
+class _BookPdfPhotoSection extends StatefulWidget {
   const _BookPdfPhotoSection({required this.entry});
 
   final BookDiaryEntry entry;
+
+  @override
+  State<_BookPdfPhotoSection> createState() => _BookPdfPhotoSectionState();
+}
+
+class _BookPdfPhotoSectionState extends State<_BookPdfPhotoSection> {
+  late final Future<List<BookImageMeta>> _metaFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _metaFuture = BookPdfPhotoMeta.resolveAll(widget.entry.photoUris);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<BookImageMeta>>(
+      future: _metaFuture,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          final estimated = BookPdfLayoutMetrics.photoBlockHeight(widget.entry);
+          if (estimated <= 0) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.only(bottom: BookEntryBoxStyle.sectionGap),
+            child: SizedBox(
+              width: BookPdfPageSpec.contentWidth,
+              height: estimated,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: BookEntryBoxStyle.photoBg,
+                  borderRadius: BorderRadius.circular(BookEntryBoxStyle.radius),
+                  border: Border.all(color: BookEntryBoxStyle.border, width: 0.6),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return _BookPdfPhotoCollage(
+          entry: widget.entry,
+          metas: snapshot.data!,
+        );
+      },
+    );
+  }
+}
+
+class _BookPdfPhotoCollage extends StatelessWidget {
+  const _BookPdfPhotoCollage({
+    required this.entry,
+    required this.metas,
+  });
+
+  final BookDiaryEntry entry;
+  final List<BookImageMeta> metas;
 
   @override
   Widget build(BuildContext context) {
@@ -377,10 +474,7 @@ class _BookPdfPhotoSection extends StatelessWidget {
 
     final stickerItems = List.generate(
       photoCount,
-      (i) => BookStickerItem(
-        index: i,
-        meta: const BookImageMeta(width: 1600, height: 1200),
-      ),
+      (i) => BookStickerItem(index: i, meta: metas[i]),
     );
 
     final collage = BookStickerCollage.layoutStickerCollage(
@@ -410,12 +504,13 @@ class _BookPdfPhotoSection extends StatelessWidget {
                     Positioned(
                       left: placement.x,
                       top: placement.y,
-                      width: placement.frameW,
-                      height: placement.frameH,
-                      child: _BookPdfPhotoTile(
+                      width: placement.photoW,
+                      height: placement.photoH,
+                      child: BookPdfPhotoTile(
                         uri: entry.photoUris[placement.index],
-                        width: placement.frameW,
-                        height: placement.frameH,
+                        meta: metas[placement.index],
+                        slotW: placement.photoW,
+                        slotH: placement.photoH,
                       ),
                     ),
                 ],
@@ -447,55 +542,4 @@ class _PhotoFrameBoxPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _BookPdfPhotoTile extends StatelessWidget {
-  const _BookPdfPhotoTile({
-    required this.uri,
-    required this.width,
-    required this.height,
-  });
-
-  final String uri;
-  final double width;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    if (uri.isEmpty) {
-      return _photoPlaceholder(width, height);
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(BookPhotoFrameStyle.radius),
-      child: SizedBox(
-        width: width,
-        height: height,
-        child: uri.startsWith('http')
-            ? EntryPhoto(url: uri, height: height, borderRadius: 0, fit: BoxFit.contain)
-            : EntryPhoto(
-                file: File(uri),
-                height: height,
-                borderRadius: 0,
-                fit: BoxFit.contain,
-              ),
-      ),
-    );
-  }
-
-  Widget _photoPlaceholder(double w, double h) {
-    return Container(
-      width: w,
-      height: h,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(BookPhotoFrameStyle.radius),
-        border: Border.all(color: BookPdfStyle.line),
-      ),
-      alignment: Alignment.center,
-      child: const Text(
-        '사진',
-        style: TextStyle(fontSize: 9, color: BookPdfStyle.placeholder),
-      ),
-    );
-  }
 }
