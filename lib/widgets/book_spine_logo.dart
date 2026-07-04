@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-import '../core/theme/app_theme.dart';
+import 'chapter_app_icon.dart';
 
+/// 앱 아이콘 — 스플래시·버전 안내 등 공통 로고
 class BookSpineLogo extends StatelessWidget {
   const BookSpineLogo({super.key, this.expanded = false});
 
@@ -10,38 +11,16 @@ class BookSpineLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 1200),
-      curve: Curves.easeInOut,
-      width: expanded ? 120 : 28,
-      height: 160,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(4),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6B5B4F), Color(0xFF8B7355), Color(0xFF6B5B4F)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.warmShadow,
-            blurRadius: 16,
-            offset: const Offset(4, 8),
-          ),
-        ],
-      ),
-      child: expanded
-          ? Center(
-              child: RotatedBox(
-                quarterTurns: 3,
-                child: Text(
-                  'CHAPTER',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Colors.white70,
-                        letterSpacing: 4,
-                      ),
-                ),
-              ),
-            )
-          : null,
-    ).animate(target: expanded ? 1 : 0).shimmer(duration: 2.seconds, delay: 400.ms);
+    final size = expanded ? 120.0 : 56.0;
+
+    return ChapterAppIcon(size: size, shadow: expanded)
+        .animate(target: expanded ? 1 : 0)
+        .scale(
+          begin: const Offset(0.88, 0.88),
+          end: const Offset(1, 1),
+          duration: 900.ms,
+          curve: Curves.easeOutCubic,
+        )
+        .fadeIn(duration: 500.ms);
   }
 }

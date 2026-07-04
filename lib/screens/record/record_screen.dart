@@ -17,6 +17,7 @@ import '../../models/daily_entry.dart';
 import '../../models/record_save_step.dart';
 import '../../providers/app_state.dart';
 import '../../services/analytics_service.dart';
+import '../../services/photo_permission_service.dart';
 import '../../widgets/record_save_overlay.dart';
 import '../../widgets/dismiss_keyboard.dart';
 import '../../widgets/mood_selector.dart';
@@ -85,8 +86,8 @@ class _RecordScreenState extends State<RecordScreen> {
       _moodEmoji = entry.moodEmoji;
       _moodLabel = entry.moodLabel;
       _noteController.text = entry.note ?? '';
-      _keptLocalPaths = slots.localPaths;
-      _keptRemoteUrls = slots.remoteUrls;
+      _keptLocalPaths = List<String>.from(slots.localPaths);
+      _keptRemoteUrls = List<String>.from(slots.remoteUrls);
       _photosEdited = false;
       _newPhotoFiles.clear();
     });
@@ -159,6 +160,54 @@ class _RecordScreenState extends State<RecordScreen> {
     );
   }
 
+  Future<bool> _ensureCameraPermission() async {
+    final outcome = await PhotoPermissionService.ensureCamera();
+    if (!mounted) return false;
+    return _handlePermissionOutcome(
+      outcome: outcome,
+      deniedMessage: '카메라 접근 권한이 필요해요. 허용해 주세요.',
+      settingsTitle: '카메라 권한',
+      settingsMessage: '설정 → Chapter → 카메라에서 접근을 허용해 주세요.',
+    );
+  }
+
+  Future<bool> _handlePermissionOutcome({
+    required MediaPermissionOutcome outcome,
+    required String deniedMessage,
+    required String settingsTitle,
+    required String settingsMessage,
+  }) async {
+    switch (outcome) {
+      case MediaPermissionOutcome.granted:
+        return true;
+      case MediaPermissionOutcome.denied:
+        _showPickError(deniedMessage);
+        return false;
+      case MediaPermissionOutcome.permanentlyDenied:
+        final open = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(settingsTitle),
+            content: Text(settingsMessage),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('나중에'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('설정 열기'),
+              ),
+            ],
+          ),
+        );
+        if (open == true) {
+          await PhotoPermissionService.openSettings();
+        }
+        return false;
+    }
+  }
+
   Future<void> _fetchAiMoodSuggestions() async {
     final files = _photoFilesForAi();
     if (files.isEmpty) {
@@ -199,8 +248,8 @@ class _RecordScreenState extends State<RecordScreen> {
       localPaths: entry.localPhotoPaths,
       remoteUrls: entry.remotePhotoUrls,
     );
-    _keptLocalPaths = slots.localPaths;
-    _keptRemoteUrls = slots.remoteUrls;
+    _keptLocalPaths = List<String>.from(slots.localPaths);
+    _keptRemoteUrls = List<String>.from(slots.remoteUrls);
   }
 
   List<String> _displayPhotoUris(DailyEntry? entry) {
@@ -297,27 +346,81 @@ class _RecordScreenState extends State<RecordScreen> {
       _showPickError('사진은 하루 최대 ${DiaryLimits.maxPhotosPerEntry}장까지예요.');
       return;
     }
-    try {
-      final images = await _pickGalleryImages(remaining);
-      if (!mounted || images.isEmpty) return;
 
-      setState(() => _pickingPhotos = true);
-      final staged = <File>[];
-      for (final x in images) {
-        final file = await PickedPhotoProcessor.stage(x);
-        if (file != null) staged.add(file);
-      }
-      if (!mounted) return;
-      if (staged.isEmpty) {
-        _showPickError('사진을 불러오지 못했어요. 다시 시도해 주세요.');
-        return;
-      }
-      await _addStagedPhotos(staged, entry);
-    } catch (e) {
-      if (mounted) _showPickError('갤러리를 열지 못했어요. 권한을 확인해 주세요.');
+    setState(() => _pickingPhotos = true);
+    try {
+      final picked = await _pickGalleryWithPermissionRecovery(remaining);
+      if (!mounted || picked == null) return;
+      await _addStagedPhotos(picked, entry);
     } finally {
       if (mounted) setState(() => _pickingPhotos = false);
     }
+  }
+
+  Future<List<File>?> _pickGalleryWithPermissionRecovery(int remaining) async {
+    try {
+      return await _pickAndStageGalleryPhotos(remaining);
+    } catch (e, st) {
+      debugPrint('Gallery pick failed: $e\n$st');
+      if (!mounted) return null;
+
+      if (!PhotoPermissionService.isPermissionError(e)) {
+        _showPickError('갤러리를 열지 못했어요. 잠시 후 다시 시도해 주세요.');
+        return null;
+      }
+
+      final outcome = await PhotoPermissionService.ensureGallery(
+        requestIfNeeded: true,
+      );
+      if (!mounted) return null;
+
+      if (outcome == MediaPermissionOutcome.granted) {
+        try {
+          return await _pickAndStageGalleryPhotos(remaining);
+        } catch (retryError, retrySt) {
+          debugPrint('Gallery pick retry failed: $retryError\n$retrySt');
+          if (!mounted) return null;
+          if (PhotoPermissionService.isPermissionError(retryError)) {
+            await _handlePermissionOutcome(
+              outcome: MediaPermissionOutcome.permanentlyDenied,
+              deniedMessage: '갤러리 접근 권한이 필요해요.',
+              settingsTitle: '갤러리 권한',
+              settingsMessage:
+                  '설정 → Chapter → 사진에서 「모든 사진」 또는 「선택한 사진」을 허용해 주세요.',
+            );
+          } else {
+            _showPickError('갤러리를 열지 못했어요. 잠시 후 다시 시도해 주세요.');
+          }
+          return null;
+        }
+      }
+
+      await _handlePermissionOutcome(
+        outcome: outcome,
+        deniedMessage: '갤러리 접근 권한이 필요해요. 허용해 주세요.',
+        settingsTitle: '갤러리 권한',
+        settingsMessage:
+            '설정 → Chapter → 사진에서 「모든 사진」 또는 「선택한 사진」을 허용해 주세요.',
+      );
+      return null;
+    }
+  }
+
+  Future<List<File>?> _pickAndStageGalleryPhotos(int remaining) async {
+    final images = await _pickGalleryImages(remaining);
+    if (!mounted || images.isEmpty) return null;
+
+    final staged = <File>[];
+    for (final x in images) {
+      final file = await PickedPhotoProcessor.stage(x);
+      if (file != null) staged.add(file);
+    }
+    if (!mounted) return null;
+    if (staged.isEmpty) {
+      _showPickError('사진을 불러오지 못했어요. 다른 사진으로 다시 시도해 주세요.');
+      return null;
+    }
+    return staged;
   }
 
   Future<void> _pickCamera() async {
@@ -327,6 +430,8 @@ class _RecordScreenState extends State<RecordScreen> {
       return;
     }
     try {
+      if (!await _ensureCameraPermission()) return;
+
       final x = await _picker.pickImage(
         source: ImageSource.camera,
         requestFullMetadata: false,

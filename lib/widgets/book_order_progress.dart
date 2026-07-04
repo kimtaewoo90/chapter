@@ -77,7 +77,7 @@ class BookOrderProgressCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(order.bookTitle, style: textTheme.titleSmall),
+                    Text(order.displayTitle, style: textTheme.titleSmall),
                     const SizedBox(height: 4),
                     Text(
                       [

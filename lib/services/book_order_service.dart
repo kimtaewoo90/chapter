@@ -102,6 +102,8 @@ class BookOrderService {
     required String recipientName,
     required bool hardcover,
     String? cover,
+    String? coverPhotoUrl,
+    String? coverTitle,
     String? style,
   }) async {
     if (entries.isEmpty) {
@@ -130,7 +132,7 @@ class BookOrderService {
       id: orderId,
       userId: userId,
       bookId: bookId,
-      bookTitle: bookTitle.trim().isEmpty ? '${DateTime.now().year} 나의 챕터' : bookTitle.trim(),
+      bookTitle: bookTitle.trim(),
       amount: amount,
       status: BookOrderStatus.pendingPayment,
       shippingAddress: shippingAddress.trim(),
@@ -138,6 +140,8 @@ class BookOrderService {
       recipientName: recipientName.trim(),
       snapshots: snapshots,
       cover: cover,
+      coverPhotoUrl: coverPhotoUrl,
+      coverTitle: coverTitle?.trim().isEmpty == true ? null : coverTitle?.trim(),
       style: style,
       hardcover: hardcover,
     );

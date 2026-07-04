@@ -53,6 +53,16 @@
         <intent>
             <action android:name="android.media.action.IMAGE_CAPTURE"/>
         </intent>
+        <intent>
+            <action android:name="android.intent.action.GET_CONTENT"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.PICK"/>
+            <data android:mimeType="image/*"/>
+        </intent>
+        <intent>
+            <action android:name="android.provider.action.PICK_IMAGES"/>
+        </intent>
         <!-- Google Sign-In (Android 11+ package visibility) -->
         <package android:name="com.google.android.gms"/>
     </queries>

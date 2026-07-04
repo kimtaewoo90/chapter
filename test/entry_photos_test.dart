@@ -1,4 +1,5 @@
 import 'package:chapter/core/utils/entry_photos.dart';
+import 'package:chapter/models/daily_entry.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -24,7 +25,7 @@ void main() {
       expect(slots.remoteUrls, ['https://a.jpg', 'https://b.jpg']);
     });
 
-    test('empty entry returns empty slots', () {
+    test('empty entry returns mutable empty slots', () {
       final slots = EntryPhotos.editSlots(
         localPaths: const [],
         remoteUrls: const [],
@@ -32,6 +33,7 @@ void main() {
 
       expect(slots.localPaths, isEmpty);
       expect(slots.remoteUrls, isEmpty);
+      expect(() => slots.localPaths.add('x'), returnsNormally);
     });
   });
 
@@ -43,6 +45,32 @@ void main() {
       );
 
       expect(uris, ['https://a.jpg']);
+    });
+  });
+
+  group('EntryPhotos.compactPhotoSlots', () {
+    test('빈 로컬 슬롯 제거 시 remote 인덱스 유지', () {
+      final compacted = EntryPhotos.compactPhotoSlots(
+        localPaths: const ['https://a.jpg', '', '/local/new.jpg'],
+        remoteUrls: const ['https://a.jpg', 'https://stale.jpg', ''],
+      );
+
+      expect(compacted.locals, ['https://a.jpg', '/local/new.jpg']);
+      expect(compacted.remotes, ['https://a.jpg', '']);
+    });
+  });
+
+  group('DailyEntry remote photo parsing', () {
+    test('빈 remote 슬롯을 유지해 local 인덱스와 맞춘다', () {
+      final entry = DailyEntry.fromJson({
+        'id': '1',
+        'userId': 'u',
+        'date': '2026-03-15T00:00:00.000',
+        'localPhotoPaths': ['/a.jpg', '/b.jpg'],
+        'remotePhotoUrls': ['https://a.jpg', ''],
+      });
+
+      expect(entry.remotePhotoUrls, ['https://a.jpg', '']);
     });
   });
 }

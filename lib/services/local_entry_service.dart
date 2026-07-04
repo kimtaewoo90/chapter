@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/utils/entry_photos.dart';
 import '../models/daily_entry.dart';
 
 /// 기기 로컬 DB (SharedPreferences) — 표시는 항상 localPhotoPaths 기준
@@ -200,9 +201,8 @@ class LocalEntryService {
         merged.add(
           local.copyWith(
             id: remote.id.isNotEmpty ? remote.id : local.id,
-            remotePhotoUrls: remote.remotePhotoUrls.isNotEmpty
-                ? remote.remotePhotoUrls
-                : local.remotePhotoUrls,
+            localPhotoPaths: local.localPhotoPaths,
+            remotePhotoUrls: _mergeRemotePhotoUrls(local, remote),
             moodEmoji: local.moodEmoji ?? remote.moodEmoji,
             moodLabel: local.moodLabel ?? remote.moodLabel,
             note: local.note?.trim().isNotEmpty == true ? local.note : remote.note,
@@ -319,4 +319,21 @@ class LocalEntryService {
   void dispose() {
     _entriesController.close();
   }
+}
+
+List<String> _mergeRemotePhotoUrls(DailyEntry local, DailyEntry remote) {
+  final localCount = EntryPhotos.displayUris(
+    localPaths: local.localPhotoPaths,
+    remoteUrls: local.remotePhotoUrls,
+    verifyLocalFiles: false,
+  ).length;
+  final remoteCount =
+      remote.remotePhotoUrls.where((url) => url.isNotEmpty).length;
+
+  if (localCount > remoteCount) return local.remotePhotoUrls;
+  if (remoteCount > localCount && remote.remotePhotoUrls.isNotEmpty) {
+    return remote.remotePhotoUrls;
+  }
+  if (local.remotePhotoUrls.isNotEmpty) return local.remotePhotoUrls;
+  return remote.remotePhotoUrls;
 }

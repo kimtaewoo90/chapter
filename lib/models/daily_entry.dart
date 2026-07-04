@@ -92,7 +92,7 @@ class DailyEntry {
 
   factory DailyEntry.fromJson(Map<String, dynamic> json) {
     var localPaths = _parseStringList(json['localPhotoPaths']);
-    final remoteUrls = _parseStringList(json['remotePhotoUrls']);
+    final remoteUrls = _parseRemotePhotoUrls(json['remotePhotoUrls']);
 
     // 이전 단일 photoUrl 데이터 호환
     if (localPaths.isEmpty) {
@@ -126,6 +126,12 @@ class DailyEntry {
   static List<String> _parseStringList(dynamic value) {
     if (value is! List) return [];
     return value.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+  }
+
+  /// localPhotoPaths와 인덱스를 맞춘 remote URL — 빈 문자열도 슬롯 유지
+  static List<String> _parseRemotePhotoUrls(dynamic value) {
+    if (value is! List) return [];
+    return value.map((e) => e?.toString() ?? '').toList();
   }
 
   /// Firestore 저장용 (로컬 경로 제외)
@@ -165,7 +171,7 @@ class DailyEntry {
     final d = doc.data()!;
     final ts = d['date'] as Timestamp?;
     final date = ts?.toDate() ?? DateTime.now();
-    var remoteUrls = _parseStringList(d['remotePhotoUrls']);
+    var remoteUrls = _parseRemotePhotoUrls(d['remotePhotoUrls']);
     if (remoteUrls.isEmpty) {
       final legacy = d['photoUrl'] as String?;
       if (legacy != null && legacy.isNotEmpty) {

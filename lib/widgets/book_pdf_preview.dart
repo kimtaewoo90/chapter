@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../core/book_layout/book_layout_types.dart';
 import '../core/book_layout/book_photo_style.dart';
+import '../core/constants/book_cover_type.dart';
+import '../core/utils/book_cover_date_range.dart';
 import '../core/book_layout/book_pdf_diary_block.dart';
 import '../core/book_layout/book_pdf_layout_metrics.dart';
 import '../core/book_layout/book_pdf_page_planner.dart';
@@ -12,6 +14,7 @@ import '../core/book_layout/book_sticker_collage.dart';
 import '../core/theme/app_theme.dart';
 import '../models/book_entry_snapshot.dart';
 import '../models/daily_entry.dart';
+import 'book_cover_artwork.dart';
 import 'book_pdf_calendar_page.dart';
 import 'book_pdf_notebook_box.dart';
 import 'book_pdf_photo_tile.dart';
@@ -22,20 +25,36 @@ class BookPdfPreview extends StatefulWidget {
     super.key,
     required this.diaryEntries,
     required this.bookTitle,
+    this.coverType = BookCoverType.chapterIcon,
+    this.coverDateRangeLabel = '',
+    this.coverPhotoUri,
+    this.coverTitle,
   });
 
   final List<BookDiaryEntry> diaryEntries;
   final String bookTitle;
+  final String coverType;
+  final String coverDateRangeLabel;
+  final String? coverPhotoUri;
+  final String? coverTitle;
 
   factory BookPdfPreview.fromDailyEntries({
     Key? key,
     required List<DailyEntry> entries,
     required String bookTitle,
+    String? coverType,
+    String? coverDateRangeLabel,
+    String? coverPhotoUri,
+    String? coverTitle,
   }) {
     return BookPdfPreview(
       key: key,
       diaryEntries: BookPreviewEntryMapper.fromDailyEntries(entries),
       bookTitle: bookTitle,
+      coverType: coverType ?? BookCoverType.chapterIcon,
+      coverDateRangeLabel: coverDateRangeLabel ?? bookCoverDateRangeLabel(entries),
+      coverPhotoUri: coverPhotoUri,
+      coverTitle: coverTitle,
     );
   }
 
@@ -43,11 +62,19 @@ class BookPdfPreview extends StatefulWidget {
     Key? key,
     required List<BookEntrySnapshot> snapshots,
     required String bookTitle,
+    String? coverType,
+    String? coverDateRangeLabel,
+    String? coverPhotoUri,
+    String? coverTitle,
   }) {
     return BookPdfPreview(
       key: key,
       diaryEntries: BookPreviewEntryMapper.fromSnapshots(snapshots),
       bookTitle: bookTitle,
+      coverType: coverType ?? BookCoverType.chapterIcon,
+      coverDateRangeLabel: coverDateRangeLabel ?? bookCoverDateRangeFromSnapshots(snapshots),
+      coverPhotoUri: coverPhotoUri,
+      coverTitle: coverTitle,
     );
   }
 
@@ -131,7 +158,12 @@ class _BookPdfPreviewState extends State<BookPdfPreview> {
                 paperBackground: page.kind != BookPdfPreviewPageKind.cover,
                 child: switch (page.kind) {
                   BookPdfPreviewPageKind.cover =>
-                    _BookPdfCoverPage(title: page.bookTitle ?? widget.bookTitle),
+                    _BookPdfCoverPage(
+                      coverType: widget.coverType,
+                      dateRangeLabel: widget.coverDateRangeLabel,
+                      photoUri: widget.coverPhotoUri,
+                      coverTitle: widget.coverTitle,
+                    ),
                   BookPdfPreviewPageKind.calendar =>
                     BookPdfCalendarPage(layout: page.calendarLayout!),
                   BookPdfPreviewPageKind.diary =>
@@ -227,53 +259,25 @@ class _BookPdfPageShell extends StatelessWidget {
 }
 
 class _BookPdfCoverPage extends StatelessWidget {
-  const _BookPdfCoverPage({required this.title});
+  const _BookPdfCoverPage({
+    required this.coverType,
+    required this.dateRangeLabel,
+    this.photoUri,
+    this.coverTitle,
+  });
 
-  final String title;
+  final String coverType;
+  final String dateRangeLabel;
+  final String? photoUri;
+  final String? coverTitle;
 
   @override
   Widget build(BuildContext context) {
-    const centerY = BookPdfPageSpec.height * 0.38;
-    const margin = BookPdfPageSpec.margin;
-    const contentWidth = BookPdfPageSpec.contentWidth;
-
-    return Stack(
-      children: [
-        Positioned(
-          left: margin + 40,
-          right: margin + 40,
-          top: centerY + 50,
-          child: Container(height: 0.5, color: BookPdfStyle.line),
-        ),
-        Positioned(
-          left: margin,
-          top: centerY - 20,
-          width: contentWidth,
-          child: Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: BookPdfStyle.title,
-              height: 1.25,
-            ),
-          ),
-        ),
-        Positioned(
-          left: margin,
-          top: centerY + 64,
-          width: contentWidth,
-          child: const Text(
-            'Chapter',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 11,
-              color: BookPdfStyle.subtitle,
-            ),
-          ),
-        ),
-      ],
+    return BookCoverArtwork(
+      coverType: coverType,
+      dateRangeLabel: dateRangeLabel,
+      photoUri: photoUri,
+      coverTitle: coverTitle,
     );
   }
 }

@@ -17,6 +17,7 @@ import '../models/app_version_gate.dart';
 import '../models/chapter_moment.dart';
 import '../models/chapter_model.dart';
 import '../core/constants/diary_limits.dart';
+import '../core/utils/entry_photos.dart';
 import '../models/daily_entry.dart';
 import '../models/daily_insight.dart';
 import '../models/monthly_review.dart';
@@ -790,33 +791,32 @@ class AppState extends ChangeNotifier {
       localPaths: localPaths,
       saveLocal: _entries.savePhotoLocal,
     );
-    localPaths = localPaths.where((p) => p.isNotEmpty).toList();
+
+    var remoteUrls = keepRemoteUrls != null
+        ? List<String>.from(keepRemoteUrls)
+        : List<String>.from(existing?.remotePhotoUrls ?? const []);
+    while (remoteUrls.length < localPaths.length) {
+      remoteUrls.add('');
+    }
+    if (remoteUrls.length > localPaths.length) {
+      remoteUrls.removeRange(localPaths.length, remoteUrls.length);
+    }
+
+    final compacted = EntryPhotos.compactPhotoSlots(
+      localPaths: localPaths,
+      remoteUrls: remoteUrls,
+    );
+    localPaths = compacted.locals;
+    remoteUrls = compacted.remotes;
+
     if (localPaths.length > DiaryLimits.maxPhotosPerEntry) {
       localPaths.removeRange(DiaryLimits.maxPhotosPerEntry, localPaths.length);
+      if (remoteUrls.length > localPaths.length) {
+        remoteUrls.removeRange(localPaths.length, remoteUrls.length);
+      }
     }
 
     onStep?.call(RecordSaveStep.uploadingPhotos);
-
-    List<String> remoteUrls;
-    if (keepRemoteUrls != null && keepLocalPaths != null) {
-      remoteUrls = List<String>.from(keepRemoteUrls);
-      while (remoteUrls.length < localPaths.length) {
-        remoteUrls.add('');
-      }
-      if (remoteUrls.length > localPaths.length) {
-        remoteUrls.removeRange(localPaths.length, remoteUrls.length);
-      }
-    } else if (keepRemoteUrls != null) {
-      remoteUrls = List<String>.from(keepRemoteUrls);
-      while (remoteUrls.length < localPaths.length) {
-        remoteUrls.add('');
-      }
-      if (remoteUrls.length > localPaths.length) {
-        remoteUrls.removeRange(localPaths.length, remoteUrls.length);
-      }
-    } else {
-      remoteUrls = List<String>.from(existing?.remotePhotoUrls ?? const []);
-    }
 
     final entryDate = existing?.date ?? day;
 
@@ -824,7 +824,7 @@ class AppState extends ChangeNotifier {
       userId: uid,
       localPaths: localPaths,
       existingRemoteUrls: remoteUrls,
-      previousLocalPaths: keepLocalPaths != null ? previousLocal : const [],
+      previousLocalPaths: previousLocal,
       date: entryDate,
     );
 
@@ -880,9 +880,10 @@ class AppState extends ChangeNotifier {
     );
 
     onStep?.call(RecordSaveStep.analyzingStory);
-    final entriesForAnalysis = cloudSyncEnabled
-        ? await _refreshCloudDataForAnalysis(uid)
-        : allEntries;
+    final entriesForAnalysis = [
+      ...allEntries.where((e) => e.id != localSaved.id),
+      localSaved,
+    ];
     final processResult = await _storyArcEngine.processEntrySaved(
       uid: uid,
       entry: localSaved,
@@ -925,20 +926,36 @@ class AppState extends ChangeNotifier {
 
     try {
       final cloud = await _cloudEntries.saveEntry(localSaved);
+      final cloudRemotes = cloud.remotePhotoUrls.isNotEmpty
+          ? cloud.remotePhotoUrls
+          : localSaved.remotePhotoUrls;
+      final finalEntry = localSaved.copyWith(
+        id: cloud.id,
+        remotePhotoUrls: EntryPhotos.alignRemoteUrls(
+          localPaths: localSaved.localPhotoPaths,
+          remoteUrls: cloudRemotes,
+        ),
+      );
+      localSaved = await _entries.saveEntry(
+        uid: uid,
+        date: finalEntry.date,
+        localPhotoPaths: finalEntry.localPhotoPaths,
+        remotePhotoUrls: finalEntry.remotePhotoUrls,
+        moodEmoji: finalEntry.moodEmoji,
+        moodLabel: finalEntry.moodLabel,
+        note: finalEntry.note,
+        weather: finalEntry.weather,
+        temperature: finalEntry.temperature,
+        aiLine: finalEntry.aiLine,
+        topics: finalEntry.topics,
+        emotion: finalEntry.emotion,
+        importanceScore: finalEntry.importanceScore,
+        storyArcId: finalEntry.storyArcId,
+        existingId: finalEntry.id,
+      );
       lastCloudSyncError = null;
       notifyListeners();
-      return localSaved.copyWith(
-        id: cloud.id,
-        remotePhotoUrls: cloud.remotePhotoUrls.isNotEmpty
-            ? cloud.remotePhotoUrls
-            : localSaved.remotePhotoUrls,
-        note: cloud.note ?? localSaved.note,
-        aiLine: cloud.aiLine ?? localSaved.aiLine,
-        topics: cloud.topics.isNotEmpty ? cloud.topics : localSaved.topics,
-        emotion: cloud.emotion ?? localSaved.emotion,
-        importanceScore: cloud.importanceScore ?? localSaved.importanceScore,
-        storyArcId: cloud.storyArcId ?? localSaved.storyArcId,
-      );
+      return localSaved;
     } catch (e, st) {
       debugPrint('Firestore save failed (local saved): $e\n$st');
       lastCloudSyncError = e.toString().contains('permission-denied')

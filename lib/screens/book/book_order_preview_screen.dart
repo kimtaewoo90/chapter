@@ -26,7 +26,7 @@ class BookOrderPreviewScreen extends StatelessWidget {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: Text(order.bookTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+          title: Text(order.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
         body: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
@@ -76,6 +76,9 @@ class BookOrderPreviewScreen extends StatelessWidget {
               BookPdfPreview.fromSnapshots(
                 snapshots: order.snapshots,
                 bookTitle: order.bookTitle,
+                coverType: order.cover,
+                coverPhotoUri: order.coverPhotoUrl,
+                coverTitle: order.coverTitle,
               )
             else
               Container(

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -7,12 +9,17 @@ import '../../models/korean_address_result.dart';
 
 import '../../core/book_layout/book_layout_engine.dart';
 import '../../core/book_layout/book_preview_entry_mapper.dart';
+import '../../core/constants/book_cover_type.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/book_cover_date_range.dart';
+import '../../core/utils/entry_photos.dart';
 import '../../models/daily_entry.dart';
 import '../../providers/app_state.dart';
 import '../../services/analytics_service.dart';
 import '../../services/book_order_service.dart';
+import '../../widgets/book_cover_artwork.dart';
 import '../../widgets/book_pdf_preview.dart';
+import '../../widgets/entry_photo.dart';
 import '../../widgets/korean_address_input.dart';
 import '../../widgets/paper_background.dart';
 
@@ -29,58 +36,58 @@ class BookOrderScreen extends StatefulWidget {
 }
 
 class _BookOrderScreenState extends State<BookOrderScreen> {
-  static const _stepLabels = ['표지', '스타일', '주문정보', '미리보기', '주문'];
+  static const _stepLabels = ['표지', '미리보기', '주문정보', '주문'];
 
   final _bookOrderService = BookOrderService();
   final _nameController = TextEditingController();
-  final _titleController = TextEditingController();
+  final _coverTitleController = TextEditingController();
   final _addressDetailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _nameFocus = FocusNode();
   final _phoneFocus = FocusNode();
   final _addressDetailFocus = FocusNode();
-  final _titleFocus = FocusNode();
+  final _coverTitleFocus = FocusNode();
 
   String _addressBase = '';
   String _zoneCode = '';
 
   int _step = 0;
-  String _cover = 'linen';
-  String _style = 'classic';
+  String _cover = BookCoverType.chapterIcon;
+  String? _coverPhotoUri;
+  static const _style = 'classic';
   bool _hardcover = true;
   bool _submitting = false;
 
   @override
-  void initState() {
-    super.initState();
-    final year = DateTime.now().year;
-    _titleController.text = '$year 나의 챕터';
-  }
-
-  @override
   void dispose() {
     _nameController.dispose();
-    _titleController.dispose();
+    _coverTitleController.dispose();
     _addressDetailController.dispose();
     _phoneController.dispose();
     _nameFocus.dispose();
     _phoneFocus.dispose();
     _addressDetailFocus.dispose();
-    _titleFocus.dispose();
+    _coverTitleFocus.dispose();
     super.dispose();
   }
 
   int get _amount => _hardcover ? BookOrderService.hardcoverPrice : BookOrderService.softcoverPrice;
 
-  String get _bookTitle {
-    final t = _titleController.text.trim();
-    return t.isEmpty ? '${DateTime.now().year} 나의 챕터' : t;
+  String? get _coverTitle {
+    final t = _coverTitleController.text.trim();
+    return t.isEmpty ? null : t;
   }
+
+  String get _orderTitleLabel => _coverTitle ?? '';
 
   String get _fullShippingAddress {
     final detail = _addressDetailController.text.trim();
     if (detail.isEmpty) return _addressBase.trim();
     return '${_addressBase.trim()} $detail';
+  }
+
+  void _dismissKeyboard() {
+    FocusManager.instance.primaryFocus?.unfocus();
   }
 
   void _onAddressSelected(KoreanAddressResult result) {
@@ -119,12 +126,14 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
       final order = await _bookOrderService.createOrder(
         userId: authUid,
         entries: _resolvedEntries(appState),
-        bookTitle: _bookTitle,
+        bookTitle: _orderTitleLabel,
         recipientName: _nameController.text.trim(),
         shippingAddress: _fullShippingAddress,
         phoneNumber: _phoneController.text.trim(),
         hardcover: _hardcover,
         cover: _cover,
+        coverPhotoUrl: _coverPhotoUri,
+        coverTitle: _coverTitle,
         style: _style,
       );
 
@@ -141,7 +150,9 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '「${order.bookTitle}」 주문이 접수됐어요. 내 책에서 진행 상황을 확인할 수 있어요.',
+            order.bookTitle.isNotEmpty
+                ? '「${order.bookTitle}」 주문이 접수됐어요. 내 책에서 진행 상황을 확인할 수 있어요.'
+                : '주문이 접수됐어요. 내 책에서 진행 상황을 확인할 수 있어요.',
           ),
           duration: const Duration(seconds: 4),
         ),
@@ -166,10 +177,14 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
   bool _isOrderInfoValid() =>
       _nameController.text.trim().isNotEmpty &&
       _phoneController.text.trim().length >= 10 &&
-      _addressBase.trim().isNotEmpty &&
-      _titleController.text.trim().isNotEmpty;
+      _addressBase.trim().isNotEmpty;
 
   bool _canProceed() {
+    if (_step == 0) {
+      final sorted = List<DailyEntry>.from(_resolvedEntries(context.read<AppState>()))
+        ..sort((a, b) => a.date.compareTo(b.date));
+      return _canProceedCover(sorted);
+    }
     if (_step == 2) return _isOrderInfoValid();
     return true;
   }
@@ -197,27 +212,251 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
     );
   }
 
+  List<String> _photoUrisForCover(List<DailyEntry> sorted) {
+    final uris = <String>[];
+    final seen = <String>{};
+    for (final entry in sorted) {
+      for (final uri in EntryPhotos.displayUris(
+        localPaths: entry.localPhotoPaths,
+        remoteUrls: entry.remotePhotoUrls,
+      )) {
+        if (seen.add(uri)) uris.add(uri);
+      }
+    }
+    return uris;
+  }
+
+  void _selectCoverType(String type, List<DailyEntry> sorted) {
+    setState(() {
+      _cover = type;
+      if (type == BookCoverType.customPhoto) {
+        final photos = _photoUrisForCover(sorted);
+        if (photos.isEmpty) {
+          _coverPhotoUri = null;
+        } else if (_coverPhotoUri == null || !photos.contains(_coverPhotoUri)) {
+          _coverPhotoUri = photos.first;
+        }
+      }
+    });
+  }
+
+  bool _canProceedCover(List<DailyEntry> sorted) {
+    if (_cover != BookCoverType.customPhoto) return true;
+    return _coverPhotoUri != null;
+  }
+
   Widget _buildStep(List<DailyEntry> sorted) {
     switch (_step) {
       case 0:
-        return _optionGrid('표지 선택', const [
-          ('linen', '린넨', Icons.texture),
-          ('matte', '매트', Icons.layers_outlined),
-          ('leather', '레더', Icons.book),
-        ], _cover, (v) => setState(() => _cover = v));
+        return _coverStep(sorted);
       case 1:
-        return _optionGrid('스타일 선택', const [
-          ('classic', '클래식', Icons.article_outlined),
-          ('cinematic', '시네마틱', Icons.movie_creation_outlined),
-          ('warm', '웜', Icons.wb_sunny_outlined),
-        ], _style, (v) => setState(() => _style = v));
+        return _previewStep(sorted);
       case 2:
         return _orderInfoStep();
-      case 3:
-        return _previewStep(sorted);
       default:
         return _confirmStep(sorted.length);
     }
+  }
+
+  Widget _coverStep(List<DailyEntry> sorted) {
+    final textTheme = Theme.of(context).textTheme;
+    final dateRange = bookCoverDateRangeLabel(sorted);
+    final photoUris = _photoUrisForCover(sorted);
+    final canPickPhoto = photoUris.isNotEmpty;
+
+    return GestureDetector(
+      onTap: _dismissKeyboard,
+      behavior: HitTestBehavior.translucent,
+      child: ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      children: [
+        Text('표지 선택', style: textTheme.titleLarge),
+        const SizedBox(height: 6),
+        Text(
+          '위에서 종류를 고르면 아래에 표지 미리보기가 나와요.',
+          style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted, height: 1.45),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: _coverTypeChip(
+                label: BookCoverType.label(BookCoverType.chapterIcon),
+                icon: Icons.auto_stories_outlined,
+                selected: _cover == BookCoverType.chapterIcon,
+                onTap: () => _selectCoverType(BookCoverType.chapterIcon, sorted),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _coverTypeChip(
+                label: BookCoverType.label(BookCoverType.customPhoto),
+                icon: Icons.photo_outlined,
+                selected: _cover == BookCoverType.customPhoto,
+                enabled: canPickPhoto,
+                onTap: canPickPhoto
+                    ? () => _selectCoverType(BookCoverType.customPhoto, sorted)
+                    : null,
+              ),
+            ),
+          ],
+        ),
+        if (!canPickPhoto)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              '사진이 있는 일기를 포함하면 사진 표지를 선택할 수 있어요.',
+              style: textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted),
+            ),
+          ),
+        const SizedBox(height: 20),
+        AspectRatio(
+          aspectRatio: 3 / 4,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            child: BookCoverArtwork(
+              key: ValueKey('$_cover-${_coverPhotoUri ?? ''}-${_coverTitle ?? ''}'),
+              coverType: _cover,
+              dateRangeLabel: dateRange,
+              photoUri: _coverPhotoUri,
+              coverTitle: _coverTitle,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _coverTitleController,
+          focusNode: _coverTitleFocus,
+          textInputAction: TextInputAction.done,
+          textAlign: TextAlign.center,
+          maxLength: 40,
+          onChanged: (_) => setState(() {}),
+          onSubmitted: (_) => _dismissKeyboard(),
+          decoration: InputDecoration(
+            labelText: '표지 제목 (선택)',
+            hintText: '비우면 제목 없이 인쇄돼요',
+            counterText: '',
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.7),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.paperDark),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.paperDark),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.accent, width: 1.5),
+            ),
+          ),
+          style: textTheme.bodyLarge,
+        ),
+        if (_cover == BookCoverType.customPhoto && canPickPhoto) ...[
+          const SizedBox(height: 20),
+          Text('표지 사진', style: textTheme.titleSmall),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 88,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: photoUris.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final uri = photoUris[index];
+                final selected = _coverPhotoUri == uri;
+                return GestureDetector(
+                  onTap: () => setState(() => _coverPhotoUri = uri),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: selected ? AppTheme.accent : AppTheme.paperDark,
+                        width: selected ? 2 : 1,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(9),
+                      child: _coverPhotoThumb(uri),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
+      ),
+    );
+  }
+
+  Widget _coverTypeChip({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback? onTap,
+    bool enabled = true,
+  }) {
+    final active = enabled && onTap != null;
+    return Material(
+      color: selected
+          ? AppTheme.accent.withValues(alpha: 0.1)
+          : Colors.white.withValues(alpha: 0.7),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: active ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected
+                  ? AppTheme.accent
+                  : AppTheme.paperDark.withValues(alpha: active ? 1 : 0.6),
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: active
+                    ? AppTheme.accent
+                    : AppTheme.inkMuted.withValues(alpha: 0.45),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: active ? AppTheme.ink : AppTheme.inkMuted.withValues(alpha: 0.55),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _coverPhotoThumb(String uri) {
+    if (uri.startsWith('http')) {
+      return SizedBox(
+        width: 72,
+        height: 72,
+        child: EntryPhoto(url: uri, height: 72, borderRadius: 0),
+      );
+    }
+    return SizedBox(
+      width: 72,
+      height: 72,
+      child: EntryPhoto(file: File(uri), height: 72, borderRadius: 0),
+    );
   }
 
   Widget _orderInfoStep() {
@@ -229,7 +468,7 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
         Text('주문 정보', style: textTheme.titleLarge),
         const SizedBox(height: 6),
         Text(
-          '배송과 표지에 쓸 정보를 입력해 주세요.',
+          '배송 정보를 입력해 주세요.',
           style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted, height: 1.4),
         ),
         const SizedBox(height: 20),
@@ -277,25 +516,10 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 14),
-        _OrderInfoCard(
-          title: '책',
-          children: [
-            _OrderInfoField(
-              controller: _titleController,
-              focusNode: _titleFocus,
-              label: '제목',
-              hint: '${DateTime.now().year} 나의 챕터',
-              icon: Icons.menu_book_outlined,
-              textInputAction: TextInputAction.done,
-              onChanged: (_) => setState(() {}),
-            ),
-          ],
-        ),
         if (!_isOrderInfoValid()) ...[
           const SizedBox(height: 12),
           Text(
-            '이름, 전화번호(10자리 이상), 주소 검색, 제목을 모두 입력해 주세요.',
+            '이름, 전화번호(10자리 이상), 주소 검색을 모두 입력해 주세요.',
             style: textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted),
           ),
         ],
@@ -322,15 +546,27 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
           '$dateRange · $pageCount페이지 (표지 포함)',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
         ),
-        const SizedBox(height: 4),
-        Text(
-          '「$_bookTitle」 · $_cover · $_style',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
-        ),
+        if (_coverTitle != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            '「$_coverTitle」 · ${BookCoverType.label(_cover)}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
+          ),
+        ] else ...[
+          const SizedBox(height: 4),
+          Text(
+            BookCoverType.label(_cover),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
+          ),
+        ],
         const SizedBox(height: 20),
         BookPdfPreview.fromDailyEntries(
           entries: sorted,
-          bookTitle: _bookTitle,
+          bookTitle: _orderTitleLabel,
+          coverType: _cover,
+          coverDateRangeLabel: bookCoverDateRangeLabel(sorted),
+          coverPhotoUri: _coverPhotoUri,
+          coverTitle: _coverTitle,
         ),
       ],
     );
@@ -352,8 +588,6 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
         _OrderInfoCard(
           title: '주문 요약',
           children: [
-            _SummaryRow(label: '책 제목', value: _bookTitle),
-            const _OrderFieldDivider(),
             _SummaryRow(label: '받는 분', value: _nameController.text.trim()),
             const _OrderFieldDivider(),
             _SummaryRow(label: '연락처', value: _formatPhone(_phoneController.text.trim())),
@@ -362,11 +596,18 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
             const _OrderFieldDivider(),
             _SummaryRow(label: '포함 일기', value: '$dayCount일'),
             const _OrderFieldDivider(),
-            _SummaryRow(label: '표지 · 스타일', value: '$_cover · $_style'),
+            _SummaryRow(
+              label: '표지',
+              value: BookCoverType.label(_cover),
+            ),
+            if (_coverTitle != null) ...[
+              const _OrderFieldDivider(),
+              _SummaryRow(label: '표지 제목', value: _coverTitle!),
+            ],
           ],
         ),
         const SizedBox(height: 20),
-        Text('표지 종류', style: textTheme.titleSmall),
+        Text('커버 종류', style: textTheme.titleSmall),
         const SizedBox(height: 10),
         _priceCard('하드커버', '${_amountFormat(BookOrderService.hardcoverPrice)}원', true),
         const SizedBox(height: 10),
@@ -396,53 +637,6 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
       return '${digits.substring(0, 3)}-${digits.substring(3, 6)}-${digits.substring(6)}';
     }
     return digits;
-  }
-
-  Widget _optionGrid(
-    String title,
-    List<(String, String, IconData)> options,
-    String selected,
-    ValueChanged<String> onSelect,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 20),
-          ...options.map((o) {
-            final isSel = selected == o.$1;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Material(
-                color: isSel ? AppTheme.accent.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.65),
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  onTap: () => onSelect(o.$1),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: isSel ? AppTheme.accent : AppTheme.paperDark),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(o.$3, color: AppTheme.accent),
-                        const SizedBox(width: 12),
-                        Expanded(child: Text(o.$2)),
-                        if (isSel) const Icon(Icons.check_circle, color: AppTheme.accent),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
-        ],
-      ),
-    );
   }
 
   Widget _priceCard(String title, String price, bool hard) {

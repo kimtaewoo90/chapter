@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:chapter/core/constants/app_fonts.dart';
 import 'package:chapter/core/theme/app_theme.dart';
+import 'package:chapter/widgets/chapter_app_icon.dart';
 
 /// App Store 6.7" — 1290×2796 px (프리미엄 마케팅 프레임)
 class StoreScreenshotFrame extends StatelessWidget {
@@ -159,15 +160,7 @@ class _BrandRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 80),
       child: Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: Image.asset(
-              'assets/images/app_icon.png',
-              width: 56,
-              height: 56,
-              fit: BoxFit.cover,
-            ),
-          ),
+          const ChapterAppIcon(size: 56),
           const SizedBox(width: 16),
           Text(
             '챕터',

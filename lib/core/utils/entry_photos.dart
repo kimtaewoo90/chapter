@@ -57,7 +57,7 @@ class EntryPhotos {
       );
     }
 
-    return (localPaths: const [], remoteUrls: const []);
+    return (localPaths: <String>[], remoteUrls: <String>[]);
   }
 
   /// 저장 직전 — pending·깨진 로컬 경로 정리 + 새 파일 영구 저장
@@ -85,6 +85,47 @@ class EntryPhotos {
       } else {
         out.add(path);
       }
+    }
+    return out;
+  }
+
+  /// 빈 로컬 슬롯 제거 시 remote URL 인덱스 유지
+  static ({List<String> locals, List<String> remotes}) compactPhotoSlots({
+    required List<String> localPaths,
+    required List<String> remoteUrls,
+  }) {
+    final locals = <String>[];
+    final remotes = <String>[];
+    for (var i = 0; i < localPaths.length; i++) {
+      final local = localPaths[i];
+      if (local.isEmpty) continue;
+      locals.add(local);
+      final remote = i < remoteUrls.length ? remoteUrls[i] : '';
+      if (remote.isNotEmpty) {
+        remotes.add(remote);
+      } else if (local.startsWith('http')) {
+        remotes.add(local);
+      } else {
+        remotes.add('');
+      }
+    }
+    while (remotes.length < locals.length) {
+      remotes.add('');
+    }
+    return (locals: locals, remotes: remotes);
+  }
+
+  /// local 슬롯 수에 맞춰 remote URL 배열 길이 정렬
+  static List<String> alignRemoteUrls({
+    required List<String> localPaths,
+    required List<String> remoteUrls,
+  }) {
+    final out = List<String>.from(remoteUrls);
+    while (out.length < localPaths.length) {
+      out.add('');
+    }
+    if (out.length > localPaths.length) {
+      out.removeRange(localPaths.length, out.length);
     }
     return out;
   }

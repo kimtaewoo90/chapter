@@ -24,10 +24,7 @@ class KoreanAddressInput extends StatelessWidget {
   final VoidCallback? onChanged;
 
   Future<void> _openSearch(BuildContext context) async {
-    final result = await Navigator.push<KoreanAddressResult>(
-      context,
-      MaterialPageRoute(builder: (_) => const KoreanAddressSearchScreen()),
-    );
+    final result = await KoreanAddressSearchScreen.showBottomSheet(context);
     if (result == null || !context.mounted) return;
 
     onAddressSelected(result);

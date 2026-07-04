@@ -14,9 +14,6 @@ class PickedPhotoProcessor {
   static const int imageQuality = 88;
 
   static Future<File?> stage(XFile picked) async {
-    final src = File(picked.path);
-    if (!await src.exists()) return null;
-
     try {
       final dir = await getApplicationDocumentsDirectory();
       final pending = Directory('${dir.path}/photos/pending');
@@ -24,7 +21,9 @@ class PickedPhotoProcessor {
         await pending.create(recursive: true);
       }
       final destPath = '${pending.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final raw = await src.readAsBytes();
+      // iOS 갤러리 경로는 File.exists()가 false일 수 있어 XFile에서 직접 읽는다.
+      final raw = await picked.readAsBytes();
+      if (raw.isEmpty) return null;
       final bytes = raw.length > 2 * 1024 * 1024
           ? await compute(_compressJpeg, raw)
           : raw;

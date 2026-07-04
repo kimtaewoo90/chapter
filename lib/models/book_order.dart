@@ -69,6 +69,8 @@ class BookOrder {
     required this.snapshots,
     this.createdAt,
     this.cover,
+    this.coverPhotoUrl,
+    this.coverTitle,
     this.style,
     this.hardcover = true,
     this.pdfStoragePath,
@@ -86,11 +88,22 @@ class BookOrder {
   final List<BookEntrySnapshot> snapshots;
   final DateTime? createdAt;
   final String? cover;
+  final String? coverPhotoUrl;
+  final String? coverTitle;
   final String? style;
   final bool hardcover;
   final String? pdfStoragePath;
 
   int get pageCount => snapshots.length;
+
+  /// 목록·앱바용 — 표지 제목 없으면 짧은 기본 라벨
+  String get displayTitle {
+    final cover = coverTitle?.trim();
+    if (cover != null && cover.isNotEmpty) return cover;
+    final book = bookTitle.trim();
+    if (book.isNotEmpty) return book;
+    return '내 책';
+  }
 
   /// Firestore에 저장된 status 문자열
   String get statusValue => status.value;
@@ -106,6 +119,8 @@ class BookOrder {
         '전화번호': phoneNumber,
         'snapshots': snapshots.map((s) => s.toFirestoreMap()).toList(),
         'cover': cover,
+        'coverPhotoUrl': coverPhotoUrl,
+        'coverTitle': coverTitle,
         'style': style,
         'hardcover': hardcover,
         'pageCount': snapshots.length,
@@ -133,6 +148,8 @@ class BookOrder {
       snapshots: snapshots,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
       cover: d['cover'] as String?,
+      coverPhotoUrl: d['coverPhotoUrl'] as String?,
+      coverTitle: d['coverTitle'] as String?,
       style: d['style'] as String?,
       hardcover: d['hardcover'] as bool? ?? true,
       pdfStoragePath: d['pdfStoragePath'] as String?,
