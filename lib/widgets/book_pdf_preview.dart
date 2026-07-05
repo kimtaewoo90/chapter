@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/book_layout/book_layout_types.dart';
 import '../core/book_layout/book_photo_style.dart';
+import '../core/constants/app_fonts.dart';
 import '../core/constants/book_cover_type.dart';
 import '../core/utils/book_cover_date_range.dart';
 import '../core/book_layout/book_pdf_diary_block.dart';
@@ -29,6 +30,7 @@ class BookPdfPreview extends StatefulWidget {
     this.coverDateRangeLabel = '',
     this.coverPhotoUri,
     this.coverTitle,
+    this.diaryFontId = kDefaultDiaryFontId,
   });
 
   final List<BookDiaryEntry> diaryEntries;
@@ -37,6 +39,7 @@ class BookPdfPreview extends StatefulWidget {
   final String coverDateRangeLabel;
   final String? coverPhotoUri;
   final String? coverTitle;
+  final AppFontId diaryFontId;
 
   factory BookPdfPreview.fromDailyEntries({
     Key? key,
@@ -46,6 +49,7 @@ class BookPdfPreview extends StatefulWidget {
     String? coverDateRangeLabel,
     String? coverPhotoUri,
     String? coverTitle,
+    AppFontId? diaryFontId,
   }) {
     return BookPdfPreview(
       key: key,
@@ -55,6 +59,7 @@ class BookPdfPreview extends StatefulWidget {
       coverDateRangeLabel: coverDateRangeLabel ?? bookCoverDateRangeLabel(entries),
       coverPhotoUri: coverPhotoUri,
       coverTitle: coverTitle,
+      diaryFontId: diaryFontId ?? kDefaultDiaryFontId,
     );
   }
 
@@ -66,6 +71,7 @@ class BookPdfPreview extends StatefulWidget {
     String? coverDateRangeLabel,
     String? coverPhotoUri,
     String? coverTitle,
+    String? diaryFontId,
   }) {
     return BookPdfPreview(
       key: key,
@@ -75,6 +81,7 @@ class BookPdfPreview extends StatefulWidget {
       coverDateRangeLabel: coverDateRangeLabel ?? bookCoverDateRangeFromSnapshots(snapshots),
       coverPhotoUri: coverPhotoUri,
       coverTitle: coverTitle,
+      diaryFontId: appFontIdFromKey(diaryFontId, fallback: kDefaultDiaryFontId),
     );
   }
 
@@ -95,6 +102,16 @@ class _BookPdfPreviewState extends State<BookPdfPreview> {
     _loadPages();
   }
 
+  @override
+  void didUpdateWidget(covariant BookPdfPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.diaryEntries != widget.diaryEntries ||
+        oldWidget.bookTitle != widget.bookTitle ||
+        oldWidget.diaryFontId != widget.diaryFontId) {
+      _loadPages();
+    }
+  }
+
   Future<void> _loadPages() async {
     final uris = widget.diaryEntries
         .expand((entry) => entry.photoUris)
@@ -105,6 +122,7 @@ class _BookPdfPreviewState extends State<BookPdfPreview> {
       _pages = BookPdfPreviewPlanner.plan(
         entries: widget.diaryEntries,
         bookTitle: widget.bookTitle,
+        diaryFontId: widget.diaryFontId,
       );
       _pagesReady = true;
     });
@@ -155,7 +173,6 @@ class _BookPdfPreviewState extends State<BookPdfPreview> {
             itemBuilder: (context, index) {
               final page = _pages[index];
               return _BookPdfPageShell(
-                paperBackground: page.kind != BookPdfPreviewPageKind.cover,
                 child: switch (page.kind) {
                   BookPdfPreviewPageKind.cover =>
                     _BookPdfCoverPage(
@@ -167,7 +184,11 @@ class _BookPdfPreviewState extends State<BookPdfPreview> {
                   BookPdfPreviewPageKind.calendar =>
                     BookPdfCalendarPage(layout: page.calendarLayout!),
                   BookPdfPreviewPageKind.diary =>
-                    _BookPdfDiaryPage(blocks: page.diaryBlocks!),
+                    _BookPdfDiaryPage(
+                      blocks: page.diaryBlocks!,
+                      topInset: page.topInset,
+                      diaryFontId: widget.diaryFontId,
+                    ),
                   BookPdfPreviewPageKind.emptyMessage => const _BookPdfEmptyPage(),
                 },
               );
@@ -204,14 +225,6 @@ class _BookPdfPreviewState extends State<BookPdfPreview> {
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          '좌우로 넘기면 실제 인쇄 PDF와 같은 배치로 볼 수 있어요.',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppTheme.inkMuted,
-              ),
-        ),
       ],
     );
   }
@@ -220,11 +233,9 @@ class _BookPdfPreviewState extends State<BookPdfPreview> {
 class _BookPdfPageShell extends StatelessWidget {
   const _BookPdfPageShell({
     required this.child,
-    this.paperBackground = false,
   });
 
   final Widget child;
-  final bool paperBackground;
 
   @override
   Widget build(BuildContext context) {
@@ -232,7 +243,7 @@ class _BookPdfPageShell extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: paperBackground ? BookPdfStyle.paper : Colors.white,
+          color: BookPdfStyle.paper,
           borderRadius: BorderRadius.circular(4),
           boxShadow: [
             BoxShadow(
@@ -278,6 +289,7 @@ class _BookPdfCoverPage extends StatelessWidget {
       dateRangeLabel: dateRangeLabel,
       photoUri: photoUri,
       coverTitle: coverTitle,
+      fillPage: true,
     );
   }
 }
@@ -303,9 +315,15 @@ class _BookPdfEmptyPage extends StatelessWidget {
 }
 
 class _BookPdfDiaryPage extends StatelessWidget {
-  const _BookPdfDiaryPage({required this.blocks});
+  const _BookPdfDiaryPage({
+    required this.blocks,
+    required this.topInset,
+    required this.diaryFontId,
+  });
 
   final List<BookDiaryBlock> blocks;
+  final double topInset;
+  final AppFontId diaryFontId;
 
   @override
   Widget build(BuildContext context) {
@@ -320,32 +338,39 @@ class _BookPdfDiaryPage extends StatelessWidget {
             child: OverflowBox(
               alignment: Alignment.topCenter,
               maxHeight: double.infinity,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                for (final block in blocks)
-                  switch (block) {
-                    BookDiaryEntryGapBlock() =>
-                      const SizedBox(height: BookPdfStyle.entryGap),
-                    BookDiaryHeaderBlock(:final entry) =>
-                      _BookPdfEntryHeader(entry: entry),
-                    BookDiaryPhotosBlock(:final entry) =>
-                      _BookPdfPhotoSection(entry: entry),
-                    BookDiaryTextBlock(:final text, :final plan, :final compact) =>
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: BookEntryBoxStyle.boxGap),
-                        child: BookPdfNotebookBox(
-                          text: text,
-                          plan: plan,
-                          minLines: BookPdfLayoutMetrics.minLinesForPlan(
-                            plan,
-                            compact: compact,
+              child: Padding(
+                padding: EdgeInsets.only(top: topInset),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final block in blocks)
+                      switch (block) {
+                        BookDiaryEntryGapBlock() =>
+                          const SizedBox(height: BookPdfStyle.entryGap),
+                        BookDiaryHeaderBlock(:final entry) =>
+                          _BookPdfEntryHeader(
+                            entry: entry,
+                            diaryFontId: diaryFontId,
                           ),
-                        ),
-                      ),
-                  },
-                ],
+                        BookDiaryPhotosBlock(:final entry) =>
+                          _BookPdfPhotoSection(entry: entry),
+                        BookDiaryTextBlock(:final text, :final plan, :final compact) =>
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: BookEntryBoxStyle.boxGap),
+                            child: BookPdfNotebookBox(
+                              text: text,
+                              plan: plan,
+                              minLines: BookPdfLayoutMetrics.minLinesForPlan(
+                                plan,
+                                compact: compact,
+                              ),
+                              diaryFontId: diaryFontId,
+                            ),
+                          ),
+                      },
+                  ],
+                ),
               ),
             ),
           ),
@@ -356,9 +381,13 @@ class _BookPdfDiaryPage extends StatelessWidget {
 }
 
 class _BookPdfEntryHeader extends StatelessWidget {
-  const _BookPdfEntryHeader({required this.entry});
+  const _BookPdfEntryHeader({
+    required this.entry,
+    required this.diaryFontId,
+  });
 
   final BookDiaryEntry entry;
+  final AppFontId diaryFontId;
 
   @override
   Widget build(BuildContext context) {
@@ -380,21 +409,23 @@ class _BookPdfEntryHeader extends StatelessWidget {
               Expanded(
                 child: Text(
                   dateLabel,
-                  style: const TextStyle(
+                  style: diaryFontStyle(
+                    diaryFontId,
                     fontSize: BookPdfStyle.dateSize,
-                    fontWeight: FontWeight.w600,
-                    color: BookPdfStyle.title,
                     height: 1.2,
+                    color: BookPdfStyle.title,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
               if (moodLabel != null)
                 Text(
                   moodLabel,
-                  style: const TextStyle(
+                  style: diaryFontStyle(
+                    diaryFontId,
                     fontSize: BookPdfStyle.moodSize,
-                    color: BookPdfStyle.muted,
                     height: 1.2,
+                    color: BookPdfStyle.muted,
                   ),
                 ),
             ],

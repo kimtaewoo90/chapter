@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/constants/book_order_limits.dart';
 import '../../core/analytics/analytics_route.dart';
 import '../../core/book_layout/book_layout_engine.dart';
 import '../../core/book_layout/book_preview_entry_mapper.dart';
@@ -29,6 +30,13 @@ class _BookScreenState extends State<BookScreen> {
   final _orderService = BookOrderService();
 
   void _startNewBook() {
+    final dayCount = context.read<AppState>().totalDays;
+    if (!BookOrderLimits.canOrder(dayCount)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(BookOrderLimits.unlockHint(dayCount))),
+      );
+      return;
+    }
     Navigator.push(
       context,
       analyticsPageRoute(
@@ -162,6 +170,7 @@ class _BookScreenState extends State<BookScreen> {
                         _EmptyOrdersBody(
                           entries: entries,
                           progress: progress,
+                          dayCount: entries.length,
                           onStartBook: _startNewBook,
                         ),
                     ],
@@ -210,17 +219,21 @@ class _EmptyOrdersBody extends StatelessWidget {
   const _EmptyOrdersBody({
     required this.entries,
     required this.progress,
+    required this.dayCount,
     required this.onStartBook,
   });
 
   final List<DailyEntry> entries;
   final double progress;
+  final int dayCount;
   final VoidCallback onStartBook;
 
   @override
   Widget build(BuildContext context) {
     final sorted = List<DailyEntry>.from(entries)..sort((a, b) => a.date.compareTo(b.date));
     final bookTitle = '${DateTime.now().year} 나의 챕터';
+    final canOrder = BookOrderLimits.canOrder(dayCount);
+    final remain = BookOrderLimits.daysUntilUnlock(dayCount);
     final pageCount = sorted.isEmpty
         ? 0
         : 1 +
@@ -267,16 +280,39 @@ class _EmptyOrdersBody extends StatelessWidget {
           BookPdfPreview.fromDailyEntries(
             entries: sorted,
             bookTitle: bookTitle,
+            diaryFontId: context.watch<AppState>().diaryFontId,
           ),
         const SizedBox(height: 24),
+        if (!canOrder) ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppTheme.accent.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.paperDark),
+            ),
+            child: Text(
+              '한 달치 기록이 쌓이면 실물 책을 만들 수 있어요.\n'
+              '지금 $dayCount일 · ${remain}일 더 기록해 주세요.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.inkMuted,
+                    height: 1.45,
+                  ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         FilledButton(
-          onPressed: onStartBook,
+          onPressed: canOrder ? onStartBook : null,
           style: FilledButton.styleFrom(
             backgroundColor: AppTheme.accent,
             minimumSize: const Size(double.infinity, 52),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           ),
-          child: const Text('실물 책 만들기'),
+          child: Text(
+            canOrder ? '실물 책 만들기' : '실물 책 (${BookOrderLimits.minDaysToOrder}일부터)',
+          ),
         ),
       ],
     );

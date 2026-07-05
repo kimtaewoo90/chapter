@@ -5,7 +5,6 @@ import '../../core/analytics/analytics_route.dart';
 import '../../core/constants/app_fonts.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/app_state.dart';
-import '../../services/analytics_service.dart';
 import '../../core/layout/shell_insets.dart';
 import '../../widgets/paper_background.dart';
 import '../book/book_screen.dart';
@@ -107,21 +106,6 @@ class MoreScreen extends StatelessWidget {
                   builder: (_) => const AccountLinkScreen(),
                 ),
               ),
-            ),
-            const SizedBox(height: 28),
-            _SectionLabel('AI'),
-            const SizedBox(height: 10),
-            _MoreTile(
-              icon: Icons.auto_awesome_outlined,
-              title: 'Gemini',
-              subtitle: state.geminiStatusMessage ?? '키 미설정 · 로컬 규칙만 사용',
-              onTap: () async {
-                await context.read<AppState>().checkGeminiConnection();
-                if (!context.mounted) return;
-                context.read<AnalyticsService>().logGeminiCheck(
-                      connected: context.read<AppState>().geminiConnected,
-                    );
-              },
             ),
             const SizedBox(height: 28),
             _SectionLabel('설정'),

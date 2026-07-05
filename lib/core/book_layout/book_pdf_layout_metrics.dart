@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../constants/app_fonts.dart';
 import 'book_layout_types.dart';
 import 'book_pdf_diary_block.dart';
 import 'book_pdf_photo_meta.dart';
@@ -51,7 +52,7 @@ class BookPdfLayoutMetrics {
         BookEntryBoxStyle.sectionGap;
   }
 
-  static TextStyle textStyleForPlan(BookLayoutPlan plan) {
+  static TextStyle _metricsTextStyle(BookLayoutPlan plan) {
     final fontSize = plan.textStyle == BookTextStyle.caption
         ? BookPdfStyle.captionSize
         : BookPdfStyle.bodySize;
@@ -63,8 +64,24 @@ class BookPdfLayoutMetrics {
     );
   }
 
-  static StrutStyle strutForPlan(BookLayoutPlan plan) {
-    final style = textStyleForPlan(plan);
+  static TextStyle textStyleForPlan(
+    BookLayoutPlan plan, {
+    AppFontId diaryFontId = kDefaultDiaryFontId,
+  }) {
+    final metrics = _metricsTextStyle(plan);
+    return diaryFontStyle(
+      diaryFontId,
+      fontSize: metrics.fontSize ?? BookPdfStyle.bodySize,
+      height: metrics.height ?? 1.55,
+      color: metrics.color,
+    );
+  }
+
+  static StrutStyle strutForPlan(
+    BookLayoutPlan plan, {
+    AppFontId diaryFontId = kDefaultDiaryFontId,
+  }) {
+    final style = _metricsTextStyle(plan);
     return StrutStyle(
       fontSize: style.fontSize,
       height: style.height,
@@ -83,15 +100,16 @@ class BookPdfLayoutMetrics {
     BookLayoutPlan plan, {
     required double maxWidth,
     required int minLines,
+    AppFontId diaryFontId = kDefaultDiaryFontId,
   }) {
     if (text.isEmpty) return 0;
 
-    final style = textStyleForPlan(plan);
+    final style = _metricsTextStyle(plan);
     final innerWidth = maxWidth - BookEntryBoxStyle.pad * 2;
     final painter = TextPainter(
       text: TextSpan(text: text, style: style),
       textDirection: TextDirection.ltr,
-      strutStyle: strutForPlan(plan),
+      strutStyle: strutForPlan(plan, diaryFontId: diaryFontId),
     )..layout(maxWidth: innerWidth);
 
     final minHeight = minLines * BookEntryBoxStyle.ruleSpacing + BookEntryBoxStyle.pad * 2;
@@ -104,12 +122,14 @@ class BookPdfLayoutMetrics {
     String text,
     BookLayoutPlan plan, {
     required int minLines,
+    AppFontId diaryFontId = kDefaultDiaryFontId,
   }) {
     return measureTextHeight(
           text,
           plan,
           maxWidth: BookPdfPageSpec.contentWidth,
           minLines: minLines,
+          diaryFontId: diaryFontId,
         ) +
         BookEntryBoxStyle.boxGap;
   }
@@ -119,6 +139,7 @@ class BookPdfLayoutMetrics {
     BookLayoutPlan plan, {
     required double maxBoxHeight,
     required int minLines,
+    AppFontId diaryFontId = kDefaultDiaryFontId,
   }) {
     if (text.isEmpty) return '';
 
@@ -130,6 +151,7 @@ class BookPdfLayoutMetrics {
           plan,
           maxWidth: BookPdfPageSpec.contentWidth,
           minLines: minLines,
+          diaryFontId: diaryFontId,
         ) <=
         totalMax) {
       return text;
@@ -145,6 +167,7 @@ class BookPdfLayoutMetrics {
             plan,
             maxWidth: BookPdfPageSpec.contentWidth,
             minLines: 1,
+            diaryFontId: diaryFontId,
           ) <=
           totalMax) {
         lo = mid;
@@ -163,7 +186,10 @@ class BookPdfLayoutMetrics {
     return slice;
   }
 
-  static double blockHeight(BookDiaryBlock block) {
+  static double blockHeight(
+    BookDiaryBlock block, {
+    AppFontId diaryFontId = kDefaultDiaryFontId,
+  }) {
     return switch (block) {
       BookDiaryEntryGapBlock() => BookPdfStyle.entryGap,
       BookDiaryHeaderBlock(:final entry) => headerBlockHeight(entry),
@@ -173,10 +199,17 @@ class BookPdfLayoutMetrics {
           text,
           plan,
           minLines: minLinesForPlan(plan, compact: compact),
+          diaryFontId: diaryFontId,
         ),
     };
   }
 
-  static double pageBlocksHeight(List<BookDiaryBlock> blocks) =>
-      blocks.fold(0.0, (sum, block) => sum + blockHeight(block));
+  static double pageBlocksHeight(
+    List<BookDiaryBlock> blocks, {
+    AppFontId diaryFontId = kDefaultDiaryFontId,
+  }) =>
+      blocks.fold(
+        0.0,
+        (sum, block) => sum + blockHeight(block, diaryFontId: diaryFontId),
+      );
 }

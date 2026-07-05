@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/constants/book_order_limits.dart';
 import '../../core/analytics/analytics_route.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/entry_diary_ai.dart';
@@ -61,9 +62,15 @@ class _BookEntrySelectScreenState extends State<BookEntrySelectScreen> {
 
   void _proceed(List<DailyEntry> allEntries) {
     final selected = allEntries.where((e) => _selectedIds.contains(e.id)).toList();
-    if (selected.isEmpty) {
+    if (selected.length < BookOrderLimits.minDaysToOrder) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('한 개 이상의 일기를 선택해 주세요.')),
+        SnackBar(
+          content: Text(
+            selected.isEmpty
+                ? BookOrderLimits.selectionHint(0)
+                : BookOrderLimits.selectionHint(selected.length),
+          ),
+        ),
       );
       return;
     }
@@ -121,7 +128,8 @@ class _BookEntrySelectScreenState extends State<BookEntrySelectScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          '월을 눌러 날짜별로 고르거나, 체크로 한 달 전체를 선택할 수 있어요.',
+                          '월을 눌러 날짜별로 고르거나, 체크로 한 달 전체를 선택할 수 있어요.\n'
+                          '책에는 최소 ${BookOrderLimits.minDaysToOrder}일 이상을 담아 주세요.',
                           style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
                         ),
                       ],
@@ -168,8 +176,8 @@ class _BookEntrySelectScreenState extends State<BookEntrySelectScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     child: Text(
-                      _selectedIds.isEmpty
-                          ? '다음 — 일기를 선택해 주세요'
+                      _selectedIds.length < BookOrderLimits.minDaysToOrder
+                          ? '다음 — ${BookOrderLimits.minDaysToOrder}일 이상 선택해 주세요 (${_selectedIds.length}일)'
                           : '다음 (${_selectedIds.length}일 선택)',
                     ),
                   ),

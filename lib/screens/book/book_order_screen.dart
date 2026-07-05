@@ -17,6 +17,7 @@ import '../../models/daily_entry.dart';
 import '../../providers/app_state.dart';
 import '../../services/analytics_service.dart';
 import '../../services/book_order_service.dart';
+import '../../widgets/book_payment_info_card.dart';
 import '../../widgets/book_cover_artwork.dart';
 import '../../widgets/book_pdf_preview.dart';
 import '../../widgets/entry_photo.dart';
@@ -135,6 +136,7 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
         coverPhotoUrl: _coverPhotoUri,
         coverTitle: _coverTitle,
         style: _style,
+        diaryFontId: appState.diaryFontId.name,
       );
 
       if (!mounted) return;
@@ -145,18 +147,17 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
             cover: _cover,
             style: _style,
           );
-      Navigator.of(context).pop();
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            order.bookTitle.isNotEmpty
-                ? '「${order.bookTitle}」 주문이 접수됐어요. 내 책에서 진행 상황을 확인할 수 있어요.'
-                : '주문이 접수됐어요. 내 책에서 진행 상황을 확인할 수 있어요.',
-          ),
-          duration: const Duration(seconds: 4),
-        ),
+
+      await showBookOrderPaymentSheet(
+        context,
+        amount: order.amount,
+        depositorName: order.recipientName,
+        orderLabel: order.displayTitle,
       );
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      Navigator.of(context).pop();
     } on BookOrderException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -567,6 +568,7 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
           coverDateRangeLabel: bookCoverDateRangeLabel(sorted),
           coverPhotoUri: _coverPhotoUri,
           coverTitle: _coverTitle,
+          diaryFontId: context.watch<AppState>().diaryFontId,
         ),
       ],
     );
@@ -581,8 +583,9 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
         Text('주문 확인', style: textTheme.titleLarge),
         const SizedBox(height: 6),
         Text(
-          '표지 종류와 최종 금액을 확인한 뒤 주문해 주세요.',
-          style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
+          '표지 종류와 최종 금액을 확인한 뒤 주문해 주세요.\n'
+          '실물 책은 계좌이체 후 제작이 시작돼요.',
+          style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted, height: 1.45),
         ),
         const SizedBox(height: 20),
         _OrderInfoCard(
@@ -621,7 +624,7 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
           ),
           child: Text(
             '주문 시 선택한 일기 스냅샷이 저장돼요.\n'
-            '입금 대기 → 입금 확인 후 제작이 시작됩니다.',
+            '주문 완료 후 입금 계좌를 안내해 드려요.',
             style: textTheme.bodySmall?.copyWith(height: 1.45),
           ),
         ),

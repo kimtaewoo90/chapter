@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/constants/book_order_limits.dart';
 import '../models/book_entry_snapshot.dart';
 import '../models/book_order.dart';
 import '../models/daily_entry.dart';
@@ -105,7 +106,13 @@ class BookOrderService {
     String? coverPhotoUrl,
     String? coverTitle,
     String? style,
+    String? diaryFontId,
   }) async {
+    if (entries.length < BookOrderLimits.minDaysToOrder) {
+      throw BookOrderException(
+        '실물 책은 일기 ${BookOrderLimits.minDaysToOrder}일 이상 선택해야 해요.',
+      );
+    }
     if (entries.isEmpty) {
       throw BookOrderException('책에 넣을 일기를 한 개 이상 선택해 주세요.');
     }
@@ -144,6 +151,7 @@ class BookOrderService {
       coverTitle: coverTitle?.trim().isEmpty == true ? null : coverTitle?.trim(),
       style: style,
       hardcover: hardcover,
+      diaryFontId: diaryFontId,
     );
 
     await _orders.doc(orderId).set(order.toFirestoreCreateMap());

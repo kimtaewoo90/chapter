@@ -19,6 +19,7 @@ class BookCoverArtwork extends StatelessWidget {
     this.coverTitle,
     this.compact = false,
     this.showDate = true,
+    this.fillPage = false,
   });
 
   final String coverType;
@@ -27,6 +28,8 @@ class BookCoverArtwork extends StatelessWidget {
   final String? coverTitle;
   final bool compact;
   final bool showDate;
+  /// PDF 미리보기 등 — 페이지 전체를 크림색으로 채움
+  final bool fillPage;
 
   static const _wordmarkAspect = ChapterWordmark.textAspect;
 
@@ -43,12 +46,12 @@ class BookCoverArtwork extends StatelessWidget {
     final hasTitle = titleText != null && titleText.isNotEmpty;
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(compact ? 8 : 12),
+      borderRadius: BorderRadius.circular(fillPage ? 0 : (compact ? 8 : 12)),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: AppTheme.paper,
-          border: Border.all(color: AppTheme.paperDark),
-          boxShadow: compact
+          border: fillPage ? null : Border.all(color: AppTheme.paperDark),
+          boxShadow: compact || fillPage
               ? null
               : const [
                   BoxShadow(

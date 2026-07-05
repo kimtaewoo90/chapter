@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../core/utils/book_cover_date_range.dart';
 import 'book_entry_snapshot.dart';
 
 /// Firestore `orders.status` 값
@@ -74,6 +75,7 @@ class BookOrder {
     this.style,
     this.hardcover = true,
     this.pdfStoragePath,
+    this.diaryFontId,
   });
 
   final String id;
@@ -93,15 +95,19 @@ class BookOrder {
   final String? style;
   final bool hardcover;
   final String? pdfStoragePath;
+  /// 주문 시점 일기 본문 폰트 (`AppFontId.name`)
+  final String? diaryFontId;
 
   int get pageCount => snapshots.length;
 
-  /// 목록·앱바용 — 표지 제목 없으면 짧은 기본 라벨
+  /// 목록·앱바용 — 표지 제목 없으면 일기 기간(yyyy.MM - yyyy.MM)
   String get displayTitle {
     final cover = coverTitle?.trim();
     if (cover != null && cover.isNotEmpty) return cover;
     final book = bookTitle.trim();
     if (book.isNotEmpty) return book;
+    final range = bookCoverDateRangeFromSnapshots(snapshots);
+    if (range.isNotEmpty) return range;
     return '내 책';
   }
 
@@ -123,6 +129,7 @@ class BookOrder {
         'coverTitle': coverTitle,
         'style': style,
         'hardcover': hardcover,
+        'diaryFontId': diaryFontId,
         'pageCount': snapshots.length,
         'createdAt': FieldValue.serverTimestamp(),
       };
@@ -153,6 +160,7 @@ class BookOrder {
       style: d['style'] as String?,
       hardcover: d['hardcover'] as bool? ?? true,
       pdfStoragePath: d['pdfStoragePath'] as String?,
+      diaryFontId: d['diaryFontId'] as String?,
     );
   }
 

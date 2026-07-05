@@ -3,11 +3,12 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../models/book_order.dart';
+import '../../widgets/book_payment_info_card.dart';
 import '../../widgets/book_order_progress.dart';
 import '../../widgets/book_pdf_preview.dart';
 import '../../widgets/paper_background.dart';
 
-/// 주문 스냅샷 기준 — 인쇄 PDF와 동일한 디지털 미리보기
+/// 주문 스냅샷 기준 — 인쇄 PDF와 같은 책 미리보기
 class BookOrderPreviewScreen extends StatelessWidget {
   const BookOrderPreviewScreen({super.key, required this.order});
 
@@ -62,8 +63,15 @@ class BookOrderPreviewScreen extends StatelessWidget {
                 ],
               ),
             ),
+            if (order.status == BookOrderStatus.pendingPayment) ...[
+              const SizedBox(height: 16),
+              BookPaymentInfoCard(
+                amount: order.amount,
+                depositorName: order.recipientName,
+              ),
+            ],
             const SizedBox(height: 20),
-            Text('디지털 미리보기', style: textTheme.titleMedium),
+            Text('책 미리보기', style: textTheme.titleMedium),
             const SizedBox(height: 6),
             Text(
               hasSnapshots
@@ -79,6 +87,7 @@ class BookOrderPreviewScreen extends StatelessWidget {
                 coverType: order.cover,
                 coverPhotoUri: order.coverPhotoUrl,
                 coverTitle: order.coverTitle,
+                diaryFontId: order.diaryFontId,
               )
             else
               Container(

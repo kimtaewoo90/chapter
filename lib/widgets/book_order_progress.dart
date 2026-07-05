@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../core/theme/app_theme.dart';
 import '../models/book_order.dart';
+import 'book_payment_info_card.dart';
 
 /// 책 제작 진행 — 사용자-facing 5단계
 class BookOrderPipeline {
@@ -91,7 +92,7 @@ class BookOrderProgressCard extends StatelessWidget {
                     if (onTap != null) ...[
                       const SizedBox(height: 6),
                       Text(
-                        '탭해서 디지털 미리보기',
+                        '탭해서 책 미리보기',
                         style: textTheme.labelSmall?.copyWith(color: AppTheme.accent),
                       ),
                     ],
@@ -106,6 +107,14 @@ class BookOrderProgressCard extends StatelessWidget {
             _StepperRow(
               completedIndex: completed,
               activeIndex: active,
+            ),
+          ],
+          if (order.status == BookOrderStatus.pendingPayment) ...[
+            const SizedBox(height: 14),
+            BookPaymentInfoCard(
+              amount: order.amount,
+              depositorName: order.recipientName,
+              compact: true,
             ),
           ],
           if (cancelled)

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/constants/app_fonts.dart';
 import '../core/book_layout/book_layout_types.dart';
 import '../core/book_layout/book_pdf_layout_metrics.dart';
 import '../core/book_layout/book_pdf_style.dart';
@@ -11,15 +12,20 @@ class BookPdfNotebookBox extends StatelessWidget {
     required this.text,
     required this.plan,
     this.minLines = 3,
+    this.diaryFontId = kDefaultDiaryFontId,
   });
 
   final String text;
   final BookLayoutPlan plan;
   final int minLines;
+  final AppFontId diaryFontId;
 
   @override
   Widget build(BuildContext context) {
-    final style = BookPdfLayoutMetrics.textStyleForPlan(plan);
+    final style = BookPdfLayoutMetrics.textStyleForPlan(
+      plan,
+      diaryFontId: diaryFontId,
+    );
     final align = plan.textStyle == BookTextStyle.caption
         ? TextAlign.center
         : TextAlign.left;
@@ -32,6 +38,7 @@ class BookPdfNotebookBox extends StatelessWidget {
           plan,
           maxWidth: width,
           minLines: minLines,
+          diaryFontId: diaryFontId,
         );
 
         return SizedBox(
@@ -82,15 +89,6 @@ class _NotebookBoxPainter extends CustomPainter {
     final innerRight = size.width - pad;
     final top = pad;
     final bottom = size.height - pad;
-    final marginX = innerLeft + BookEntryBoxStyle.marginLineInset;
-
-    canvas.drawLine(
-      Offset(marginX, top),
-      Offset(marginX, bottom),
-      Paint()
-        ..color = BookEntryBoxStyle.marginLine
-        ..strokeWidth = 0.45,
-    );
 
     final linePaint = Paint()
       ..color = BookEntryBoxStyle.ruleColor

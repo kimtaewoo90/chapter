@@ -59,7 +59,7 @@ void main() {
     expect(plan.pageMode, BookPageMode.compact);
   });
 
-  test('planBookPages — 짧은 글끼리 한 페이지에 묶음', () {
+  test('planBookPages — 일기마다 한 페이지', () {
     BookDiaryEntry short(int n) => entry(
           date: '2026-03-0$n',
           title: '일기 $n',
@@ -67,7 +67,9 @@ void main() {
         );
 
     final pages = BookLayoutEngine.planBookPages([short(1), short(2), short(3), short(4)]);
-    expect(pages.length, 1);
-    expect(pages.first.items.length, 4);
+    expect(pages.length, 4);
+    for (final page in pages) {
+      expect(page.items.length, 1);
+    }
   });
 }
