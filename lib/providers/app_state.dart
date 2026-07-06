@@ -28,9 +28,10 @@ import '../models/today_weather.dart';
 import '../models/user_preferences.dart';
 import '../core/utils/ai_narrative.dart';
 import '../core/utils/chapter_segmenter.dart';
+import '../core/utils/monthly_review_digest_builder.dart';
 import '../core/utils/monthly_review_period.dart';
+import '../core/utils/monthly_review_source_hash.dart';
 import '../core/utils/entry_diary_ai.dart';
-import '../core/utils/entry_photos.dart';
 import '../services/ai_journal_service.dart';
 import '../services/local_story_arc_service.dart';
 import '../services/story_arc_engine.dart';
@@ -1223,6 +1224,8 @@ class AppState extends ChangeNotifier {
     if (uid == null) return;
 
     _reloadMonthlyReviewArchive();
+    await _backfillSnapshotMetadataOnce();
+
     final today = todayDate;
     final knownKeys = archivedMonthlyReviews.map((r) => r.periodKey).toSet();
     String? revealCandidate;
@@ -1280,6 +1283,81 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     return pendingMonthlyReveal ??
         (revealedMonthlyReviews.isNotEmpty ? revealedMonthlyReviews.first : null);
+  }
+
+  List<DailyEntry> _entriesForMonthlyPeriod(String periodKey) {
+    final parts = periodKey.split('-');
+    if (parts.length != 2) return [];
+    final year = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    if (year == null || month == null) return [];
+    return MonthlyReviewPeriod.entriesInMonth(
+      allEntries,
+      year: year,
+      month: month,
+    );
+  }
+
+  /// 스냅샷 생성 후 해당 월 일기가 바뀌었는지
+  bool isMonthlyReviewStale(String periodKey) {
+    final review = monthlyReviewForPeriod(periodKey);
+    final hash = review?.sourceEntryHash;
+    if (review == null || hash == null || hash.isEmpty) return false;
+    final window = _entriesForMonthlyPeriod(periodKey);
+    if (window.isEmpty) return false;
+    return MonthlyReviewSourceHash.compute(window) != hash;
+  }
+
+  /// 사용자가 요청할 때만 스냅샷 재생성
+  Future<MonthlyReview?> regenerateMonthlyReview(String periodKey) async {
+    final uid = _localUid;
+    if (uid == null) return null;
+
+    final parts = periodKey.split('-');
+    if (parts.length != 2) return null;
+    final year = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    if (year == null || month == null) return null;
+
+    final review = await _storyArcEngine.generateMonthlyReviewForPeriod(
+      uid: uid,
+      year: year,
+      month: month,
+      allEntries: allEntries,
+    );
+    _reloadMonthlyReviewArchive();
+    notifyListeners();
+    return review;
+  }
+
+  /// hash가 없는 기존 리포트에 fingerprint만 1회 보강 (내용은 고정)
+  Future<void> _backfillSnapshotMetadataOnce() async {
+    for (final review in List<MonthlyReview>.from(archivedMonthlyReviews)) {
+      if (review.sourceEntryHash != null && review.sourceEntryHash!.isNotEmpty) {
+        continue;
+      }
+
+      final window = _entriesForMonthlyPeriod(review.periodKey);
+      if (window.length < MonthlyReviewPeriod.minEntriesToGenerate) continue;
+
+      var updated = review;
+      if (review.digest == null || !review.digest!.hasFacts) {
+        final digest = MonthlyReviewDigestBuilder.build(
+          window,
+          periodLabel: review.periodLabel,
+        );
+        updated = review.copyWith(
+          digest: digest,
+          summary: review.summary.isNotEmpty ? review.summary : digest.factSummary,
+        );
+      }
+
+      updated = updated.copyWith(
+        sourceEntryHash: MonthlyReviewSourceHash.compute(window),
+      );
+      await _storyArcs.upsertMonthlyReview(updated);
+    }
+    _reloadMonthlyReviewArchive();
   }
 
   Future<void> dismissMonthlyReveal() async {

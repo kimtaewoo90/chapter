@@ -18,6 +18,7 @@ import 'services/entry_service.dart';
 import 'services/local_chapter_service.dart';
 import 'services/local_entry_service.dart';
 import 'services/local_story_arc_service.dart';
+import 'services/monthly_review_service.dart';
 import 'services/photo_storage_service.dart';
 import 'services/story_arc_service.dart';
 
@@ -64,8 +65,12 @@ class ChapterRoot extends StatelessWidget {
         Provider(create: (_) => LocalEntryService()),
         Provider(create: (_) => LocalChapterService()),
         Provider(create: (_) => StoryArcService()),
+        Provider(create: (_) => MonthlyReviewService()),
         Provider(
-          create: (ctx) => LocalStoryArcService(cloud: ctx.read<StoryArcService>()),
+          create: (ctx) => LocalStoryArcService(
+            cloud: ctx.read<StoryArcService>(),
+            monthlyReviews: ctx.read<MonthlyReviewService>(),
+          ),
         ),
         Provider(create: (_) => PhotoStorageService()),
         Provider(create: (_) => EntryService()),

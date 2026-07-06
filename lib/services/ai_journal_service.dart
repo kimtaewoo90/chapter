@@ -13,8 +13,10 @@ import '../core/utils/entry_diary_ai.dart';
 import '../models/daily_entry.dart';
 import '../models/journal_analysis.dart';
 import '../models/monthly_review.dart';
+import '../models/monthly_review_digest.dart';
 import '../models/story_arc.dart';
 import '../models/story_arc_ai_results.dart';
+import '../models/story_arc_status.dart';
 import 'mood_profile_service.dart';
 
 /// 일기 AI — Gemini Structured JSON + Story Arc 분류 (실패 시 규칙 폴백)
@@ -118,18 +120,42 @@ class AiJournalService {
     }
   }
 
-  /// 월간 리포트
+  /// 월간 리포트 — 팩트 digest 기반 한 줄 회고
   Future<MonthlyReview?> generateMonthlyReview({
     required List<DailyEntry> entries,
     required List<StoryArc> storyArcs,
+    required MonthlyReviewDigest digest,
   }) async {
     if (!AiConfig.isGeminiConfigured || entries.length < 3) return null;
 
     try {
-      final model = _model(maxOutputTokens: 400, temperature: 0.55);
-      final prompt = _buildMonthlyReviewPrompt(entries: entries, storyArcs: storyArcs);
+      final model = _model(maxOutputTokens: 120, temperature: 0.45);
+      final prompt = _buildMonthlyReviewPrompt(
+        entries: entries,
+        storyArcs: storyArcs,
+        digest: digest,
+      );
       final response = await model.generateContent([Content.text(prompt)]);
-      return _parseMonthlyReview(response.text ?? '');
+      final reflection = _parseMonthlyReflection(response.text ?? '');
+      if (reflection == null || reflection.isEmpty) return null;
+
+      final changes = storyArcs
+          .where((a) => a.status == StoryArcStatus.completed)
+          .map((a) => a.displayTitle)
+          .where((t) => t.isNotEmpty)
+          .take(3)
+          .toList();
+
+      return MonthlyReview(
+        periodKey: '',
+        periodLabel: '',
+        generatedAt: DateTime.now(),
+        topTopics: const [],
+        summary: reflection,
+        growth: '',
+        chapterChanges: changes,
+        digest: digest,
+      );
     } catch (e, st) {
       debugPrint('AiJournalService: generateMonthlyReview failed — $e\n$st');
       return null;
@@ -289,28 +315,46 @@ $lines
   String _buildMonthlyReviewPrompt({
     required List<DailyEntry> entries,
     required List<StoryArc> storyArcs,
+    required MonthlyReviewDigest digest,
   }) {
-    final lines = entries.take(25).map(_entrySummaryLine).join('\n');
     final arcs = storyArcs.map((a) => '${a.displayTitle} (${a.status.label})').join(', ');
+    final digestJson = jsonEncode(digest.toJson());
 
     return '''
-최근 ${entries.length}일 일기 + Story Arc를 바탕으로 월간 리포트 JSON을 만드세요.
+당신은 일기 앱 CHAPTER의 월간 회고 도우미입니다. **창작하지 말고** 아래 팩트만 사용하세요.
+
+## 집계 팩트 (JSON)
+$digestJson
+
+## 기록 일수
+${entries.length}일
 
 ## Story Arcs
 ${arcs.isEmpty ? '(없음)' : arcs}
 
-## 일기
-$lines
+## 할 일
+위 팩트만 근거로, 사용자가 한 달을 돌아볼 때 도움이 되는 **한국어 1~2문장**(100자 이내)을 씁니다.
+- 팩트에 없는 인물·장소·감정·사건을 **추가하지 마세요**
+- streak·부족함 비난·클리셰 금지
+- 따뜻한 회고 톤
 
 ## 출력 (JSON만)
 {
-  "top_topics": ["주제1", "주제2"],
-  "summary": "2~3문장 요약",
-  "growth": "성장 포인트 1~2문장",
-  "emotion_trend": "감정 변화 한 줄",
-  "chapter_changes": ["완성·전환된 챕터 제목"]
+  "reflection": "한 줄 회고"
 }
 ''';
+  }
+
+  String? _parseMonthlyReflection(String raw) {
+    final map = _extractJsonMap(raw);
+    if (map != null) {
+      final reflection = map['reflection'] as String? ?? map['summary'] as String?;
+      if (reflection != null && reflection.trim().isNotEmpty) {
+        return _cleanModelOutput(reflection.trim());
+      }
+    }
+    final trimmed = _cleanModelOutput(raw.trim());
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   String _entrySummaryLine(DailyEntry e) {

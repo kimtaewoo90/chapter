@@ -2,6 +2,7 @@ import '../models/daily_entry.dart';
 import '../models/daily_insight.dart';
 import '../models/journal_analysis.dart';
 import '../models/monthly_review.dart';
+import '../models/monthly_review_digest.dart';
 import '../models/story_arc.dart';
 import '../models/story_arc_ai_results.dart';
 import '../models/story_arc_mapping.dart';
@@ -9,7 +10,9 @@ import '../models/story_arc_status.dart';
 import '../core/utils/ai_narrative.dart';
 import '../core/utils/chapter_segmenter.dart';
 import '../core/utils/journal_analysis_fallback.dart';
+import '../core/utils/monthly_review_digest_builder.dart';
 import '../core/utils/monthly_review_period.dart';
+import '../core/utils/monthly_review_source_hash.dart';
 import '../models/chapter_moment.dart';
 import '../core/config/ai_config.dart';
 import 'ai_journal_service.dart';
@@ -137,21 +140,34 @@ class StoryArcEngine {
     final periodLabel = MonthlyReviewPeriod.periodLabel(year, month);
     final arcs = _arcs.arcsForUser(uid);
 
+    final digest = MonthlyReviewDigestBuilder.build(
+      window,
+      periodLabel: periodLabel,
+    );
+    final sourceEntryHash = MonthlyReviewSourceHash.compute(window);
+
     final review = await _ai.generateMonthlyReview(
       entries: window,
       storyArcs: arcs,
+      digest: digest,
     );
 
-    final resolved = (review ??
-            _fallbackMonthlyReview(
-              window,
-              arcs,
-              periodLabel: periodLabel,
-            ))
-        .copyWith(
+    final fallback = _fallbackMonthlyReview(
+      window,
+      arcs,
+      periodLabel: periodLabel,
+      digest: digest,
+    );
+
+    final resolved = (review ?? fallback).copyWith(
       periodKey: periodKey,
       periodLabel: periodLabel,
       generatedAt: DateTime.now(),
+      digest: review?.digest ?? digest,
+      sourceEntryHash: sourceEntryHash,
+      summary: (review?.summary.isNotEmpty == true)
+          ? review!.summary
+          : fallback.summary,
     );
 
     await _arcs.upsertMonthlyReview(resolved);
@@ -466,17 +482,8 @@ class StoryArcEngine {
     List<DailyEntry> window,
     List<StoryArc> arcs, {
     required String periodLabel,
+    required MonthlyReviewDigest digest,
   }) {
-    final topicCounts = <String, int>{};
-    for (final e in window) {
-      for (final t in e.topics) {
-        topicCounts[t] = (topicCounts[t] ?? 0) + 1;
-      }
-    }
-    final topTopics = topicCounts.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    final labels = topTopics.take(3).map((e) => JournalAnalysisFallback.categoryLabel(e.key)).toList();
-
     final changes = arcs
         .where((a) => a.status == StoryArcStatus.completed)
         .map((a) => a.displayTitle)
@@ -487,12 +494,11 @@ class StoryArcEngine {
       periodKey: MonthlyReviewPeriod.periodKeyFromDate(window.first.date),
       periodLabel: periodLabel,
       generatedAt: DateTime.now(),
-      topTopics: labels,
-      summary: labels.isEmpty
-          ? '$periodLabel, ${window.length}일의 순간이 쌓였어요.'
-          : '$periodLabel, ${labels.join(' · ')} 이야기가 두드러졌어요.',
-      growth: '꾸준히 기록하며 자신만의 이야기를 쌓고 있어요.',
+      topTopics: const [],
+      summary: digest.factSummary,
+      growth: '',
       chapterChanges: changes,
+      digest: digest,
     );
   }
 

@@ -169,13 +169,27 @@ revealedAt: DateTime?  // reveal 본 시각
 topTopics, summary, growth, emotionTrend, chapterChanges  // 기존 유지
 ```
 
-### 저장 위치 (제안)
+### 저장 위치 (2026-07-06)
 
-| 계층 | Phase 1 | Phase 3 |
-|------|---------|---------|
-| 로컬 | `List<MonthlyReview>` JSON (`monthly_reviews_archive`) | 동일 + 마이그레이션 |
-| 클라우드 | `story_arc_meta.monthlyReview` 단일 (현행) | `users/{uid}/monthly_reviews/{periodKey}` |
-| AppState | `archivedMonthlyReviews`, `pendingMonthlyReveal` | + Firestore stream |
+| 계층 | 경로 | 정책 |
+|------|------|------|
+| 로컬 | `SharedPreferences` → `monthly_reviews_archive` | 오프라인 캐시 |
+| **Firestore** | `users/{uid}/monthly_reviews/{yyyy-MM}` | **스냅샷 원본** (문서 1개 = 월 1개) |
+| 레거시 | `story_arc_meta/state.monthlyReviews[]` | 읽기만 → 신규 컬렉션으로 마이그레이션 |
+
+### 스냅샷 정책
+
+- 생성 시 `digest` + `summary` + `sourceEntryHash` 저장 후 **고정**
+- 일기 수정해도 리포트는 **자동 재계산 안 함**
+- `sourceEntryHash`가 현재 일기와 다르면 상세 화면에 **「다시 정리하기」** 표시
+- `story_arc_meta`에는 더 이상 월간 리포트를 쓰지 않음
+
+```dart
+// 제안 필드 (구현 반영)
+periodKey, periodLabel, generatedAt, revealedAt
+digest, summary, sourceEntryHash
+topTopics, growth, emotionTrend, chapterChanges  // 레거시 호환
+```
 
 ### 마이그레이션
 
@@ -231,7 +245,40 @@ entriesInMonth(period) >= 3
 
 ---
 
-## 콘텐츠·락인 전략 (제안)
+## 콘텐츠·락인 전략 (2026-07-06 갱신)
+
+**팩트 기반 월간 회고** — 일기에서 직접 집계한 숫자·단어·무드·장소·사람을 보여 준다.
+
+### 리포트 구조 (reveal 후 1스크롤)
+
+1. **한눈에** — 기록 N일 · 사진 N장 · 글 쓴 날 N
+2. **가장 많이 찍힌 무드** — 이모지+라벨 빈도
+3. **자주 남긴 장소** — location 필드 빈도
+4. **함께한 사람** — 일기 본문 키워드 (엄마, 아이, 친구 등)
+5. **자주 쓴 단어** — note·aiLine 토큰 빈도 (불용어 제외)
+6. **감정 톤** — AI 분류 emotion 빈도
+7. **한 달을 돌아보며** — 팩트만 쓰는 AI 한 줄 (없으면 factSummary)
+
+### 공개 타이밍 (Q1 답)
+
+- **6월 리포트는 7월 6일에 뜨는 것이 정상** — 달이 끝난 뒤(6/30 이후) 첫 실행 시 생성·reveal
+- 6/30에 앱을 안 열어도, 7월에 열면 6월 리포트가 도착
+- **7월 리포트**는 7/31 이후에 열림
+
+피할 것: streak, 기록 부족 비난, Spotify Wrapped식 과한 그래픽.
+
+### 완성 챕터와의 연동
+
+- `chapterChanges`: 그 달 **완성된 챕터 제목**만 언급 (챕터 본문 중복 ❌)
+- 챕터가 0개인 달도 많음 → 월간만으로도 완결
+
+### 기록 3일 미만
+
+*「조용한 한 달이었어요」* — 비난 없이 톤 유지 ([§미결정](#미결정-사항-결정-필요) 참고).
+
+---
+
+## 콘텐츠·락인 전략 (구 제안 — 참고용)
 
 통계 나열이 아니라 **“한 달 뒤에야 알게 되는 나”** — 짧고 하나의 놀라움에 집중.
 
@@ -284,7 +331,7 @@ entriesInMonth(period) >= 3
 
 ### Phase 3 — 백엔드
 
-- [ ] Firestore `monthly_reviews` 컬렉션 + rules
+- [x] Firestore `monthly_reviews` 컬렉션 + rules
 - [ ] Cloud Functions 스케줄 + Gemini
 - [ ] FCM
 - [ ] 앱: 서버 생성 리포트 우선, 로컬은 캐시

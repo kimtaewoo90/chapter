@@ -94,7 +94,7 @@ class _MonthlyReviewRevealOverlayState extends State<MonthlyReviewRevealOverlay>
                       .slideY(begin: 0.08, curve: Curves.easeOut),
                   const SizedBox(height: 16),
                   Text(
-                    '${widget.review.periodLabel}의 이야기가 정리됐어요',
+                    '${widget.review.periodLabel}이 지나갔어요',
                     textAlign: TextAlign.center,
                     style: textTheme.bodyLarge?.copyWith(
                       color: Colors.white.withValues(alpha: 0.82),
@@ -103,10 +103,21 @@ class _MonthlyReviewRevealOverlayState extends State<MonthlyReviewRevealOverlay>
                   )
                       .animate()
                       .fadeIn(delay: 750.ms, duration: 600.ms),
-                  if (widget.review.summary.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '그달 일기를 모아 한 달을 돌아볼 수 있어요',
+                    textAlign: TextAlign.center,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.55),
+                      height: 1.5,
+                    ),
+                  )
+                      .animate()
+                      .fadeIn(delay: 820.ms, duration: 500.ms),
+                  if (widget.review.previewLine.isNotEmpty) ...[
                     const SizedBox(height: 24),
                     Text(
-                      widget.review.summary,
+                      widget.review.previewLine,
                       textAlign: TextAlign.center,
                       style: textTheme.bodyMedium?.copyWith(
                         color: Colors.white.withValues(alpha: 0.72),

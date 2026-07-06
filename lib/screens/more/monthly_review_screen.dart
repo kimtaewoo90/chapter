@@ -75,6 +75,7 @@ class _MonthlyReviewScreenState extends State<MonthlyReviewScreen> {
                     _CurrentMonthHintCard(
                       daysLeft: daysLeft,
                       entryCount: currentMonthEntries.length,
+                      pendingPeriodLabel: state.pendingMonthlyReveal?.periodLabel,
                     ),
                   if (!currentRevealed && revealed.isNotEmpty)
                     const SizedBox(height: 20),
@@ -112,18 +113,31 @@ class _CurrentMonthHintCard extends StatelessWidget {
   const _CurrentMonthHintCard({
     required this.daysLeft,
     required this.entryCount,
+    this.pendingPeriodLabel,
   });
 
   final int daysLeft;
   final int entryCount;
+  final String? pendingPeriodLabel;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final label = MonthlyReviewPeriod.periodLabelFromDate(DateTime.now());
 
+    String headline;
+    if (pendingPeriodLabel != null) {
+      headline = '$pendingPeriodLabel 리포트가 도착했어요';
+    } else if (daysLeft > 0) {
+      headline = '이번 달 이야기는 말일에 열려요';
+    } else {
+      headline = '이번 달 이야기를 정리하는 중이에요';
+    }
+
     String subtitle;
-    if (daysLeft > 0) {
+    if (pendingPeriodLabel != null) {
+      subtitle = '지난달이 끝난 뒤, 그달 기록만 모아 열어요';
+    } else if (daysLeft > 0) {
       subtitle = '말일까지 $daysLeft일 · 기록 $entryCount일';
     } else if (entryCount < MonthlyReviewPeriod.minEntriesToGenerate) {
       subtitle = '이번 달은 조용히 흘러갔어요';
@@ -148,9 +162,7 @@ class _CurrentMonthHintCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            daysLeft > 0
-                ? '이번 달 이야기는 말일에 열려요'
-                : '이번 달 이야기를 정리하는 중이에요',
+            headline,
             style: textTheme.bodyLarge,
           ),
           const SizedBox(height: 6),
@@ -194,10 +206,10 @@ class _ReviewListTile extends StatelessWidget {
                         review.periodLabel,
                         style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                       ),
-                      if (review.summary.isNotEmpty) ...[
+                      if (review.previewLine.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Text(
-                          review.summary,
+                          review.previewLine,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: textTheme.bodySmall?.copyWith(

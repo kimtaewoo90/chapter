@@ -179,9 +179,6 @@ class StoryArcService {
       lastDiscoveryAt: bundle.lastDiscoveryAt,
       whisperShownArcIds: bundle.whisperShownArcIds,
       dailyInsight: bundle.dailyInsight,
-      monthlyReviews: bundle.monthlyReviews.isNotEmpty
-          ? bundle.monthlyReviews
-          : (bundle.monthlyReview != null ? [bundle.monthlyReview!] : null),
     );
   }
 }

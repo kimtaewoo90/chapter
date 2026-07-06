@@ -1,4 +1,5 @@
 import '../core/utils/monthly_review_period.dart';
+import 'monthly_review_digest.dart';
 
 /// 캘린더 월 단위 월간 리포트
 class MonthlyReview {
@@ -12,6 +13,8 @@ class MonthlyReview {
     this.revealedAt,
     this.emotionTrend = '',
     this.chapterChanges = const [],
+    this.digest,
+    this.sourceEntryHash,
   });
 
   final String periodKey;
@@ -23,8 +26,17 @@ class MonthlyReview {
   final String growth;
   final String emotionTrend;
   final List<String> chapterChanges;
+  final MonthlyReviewDigest? digest;
+  /// 생성 시점 일기 fingerprint — 이후 수정 감지용
+  final String? sourceEntryHash;
 
   bool get wasRevealed => revealedAt != null;
+
+  /// 리스트·reveal 미리보기용 한 줄
+  String get previewLine {
+    if (digest != null && digest!.factSummary.isNotEmpty) return digest!.factSummary;
+    return summary;
+  }
 
   MonthlyReview copyWith({
     String? periodKey,
@@ -36,6 +48,8 @@ class MonthlyReview {
     String? growth,
     String? emotionTrend,
     List<String>? chapterChanges,
+    MonthlyReviewDigest? digest,
+    String? sourceEntryHash,
   }) =>
       MonthlyReview(
         periodKey: periodKey ?? this.periodKey,
@@ -47,6 +61,8 @@ class MonthlyReview {
         growth: growth ?? this.growth,
         emotionTrend: emotionTrend ?? this.emotionTrend,
         chapterChanges: chapterChanges ?? this.chapterChanges,
+        digest: digest ?? this.digest,
+        sourceEntryHash: sourceEntryHash ?? this.sourceEntryHash,
       );
 
   Map<String, dynamic> toJson() => {
@@ -59,6 +75,9 @@ class MonthlyReview {
         'growth': growth,
         'emotionTrend': emotionTrend,
         'chapterChanges': chapterChanges,
+        if (digest != null) 'digest': digest!.toJson(),
+        if (sourceEntryHash != null && sourceEntryHash!.isNotEmpty)
+          'sourceEntryHash': sourceEntryHash,
       };
 
   factory MonthlyReview.fromJson(Map<String, dynamic> json) {
@@ -74,6 +93,12 @@ class MonthlyReview {
       periodLabel = MonthlyReviewPeriod.periodLabelFromDate(generatedAt);
     }
 
+    MonthlyReviewDigest? digest;
+    final digestRaw = json['digest'];
+    if (digestRaw is Map) {
+      digest = MonthlyReviewDigest.fromJson(Map<String, dynamic>.from(digestRaw));
+    }
+
     return MonthlyReview(
       periodKey: periodKey,
       periodLabel: periodLabel,
@@ -86,6 +111,8 @@ class MonthlyReview {
       growth: json['growth'] as String? ?? '',
       emotionTrend: json['emotionTrend'] as String? ?? '',
       chapterChanges: _parseStringList(json['chapterChanges']),
+      digest: digest,
+      sourceEntryHash: json['sourceEntryHash'] as String?,
     );
   }
 

@@ -11,10 +11,15 @@ import '../models/story_arc.dart';
 import '../models/story_arc_mapping.dart';
 import '../models/story_arc_status.dart';
 import 'story_arc_service.dart';
+import 'monthly_review_service.dart';
 
 /// Story Arc + Mapping — Firestore가 source of truth, SharedPreferences는 오프라인 캐시
 class LocalStoryArcService {
-  LocalStoryArcService({StoryArcService? cloud}) : _cloud = cloud ?? StoryArcService() {
+  LocalStoryArcService({
+    StoryArcService? cloud,
+    MonthlyReviewService? monthlyReviews,
+  })  : _cloud = cloud ?? StoryArcService(),
+        _monthlyReviews = monthlyReviews ?? MonthlyReviewService() {
     _arcsController = StreamController<List<StoryArc>>.broadcast(
       onListen: () {
         if (_cachedArcs != null && _currentUid != null) {
@@ -25,6 +30,7 @@ class LocalStoryArcService {
   }
 
   final StoryArcService _cloud;
+  final MonthlyReviewService _monthlyReviews;
 
   late final StreamController<List<StoryArc>> _arcsController;
   List<StoryArc>? _cachedArcs;
@@ -63,7 +69,10 @@ class LocalStoryArcService {
     _currentUid = uid;
     try {
       final remote = await _cloud.fetchAll(uid);
-      await _applyBundle(uid, remote);
+      final reviewSnapshots = await _monthlyReviews.fetchAll(uid);
+      final bundle = _bundleWithReviews(remote, reviewSnapshots);
+      await _applyBundle(uid, bundle);
+      await _migrateLegacyReviewsToCollection(uid, remote);
     } catch (e, st) {
       debugPrint('LocalStoryArcService: refreshFromCloud failed — $e\n$st');
     }
@@ -76,10 +85,15 @@ class LocalStoryArcService {
     if (_cloudSyncEnabled) {
       try {
         final remote = await _cloud.fetchAll(uid);
-        if (remote.isEmpty && (_cachedArcs?.isNotEmpty ?? false)) {
+        final reviewSnapshots = await _monthlyReviews.fetchAll(uid);
+        final bundle = _bundleWithReviews(remote, reviewSnapshots);
+
+        if (bundle.isEmpty && (_cachedArcs?.isNotEmpty ?? false)) {
           await _cloud.uploadAll(uid, _localBundle(uid));
+          await _monthlyReviews.uploadAll(uid, _cachedReviews);
         } else {
-          await _applyBundle(uid, remote);
+          await _applyBundle(uid, bundle);
+          await _migrateLegacyReviewsToCollection(uid, remote);
         }
       } catch (e, st) {
         debugPrint('LocalStoryArcService: cloud load failed, using cache — $e\n$st');
@@ -173,7 +187,7 @@ class LocalStoryArcService {
       _cachedReviews.add(review);
     }
     await _persistReviews();
-    await _syncMetaToCloud(monthlyReviews: _cachedReviews);
+    await _syncReviewToCloud(review);
   }
 
   Future<void> markMonthlyReviewRevealed(String periodKey) async {
@@ -182,7 +196,7 @@ class LocalStoryArcService {
     if (idx < 0) return;
     _cachedReviews[idx] = _cachedReviews[idx].copyWith(revealedAt: DateTime.now());
     await _persistReviews();
-    await _syncMetaToCloud(monthlyReviews: _cachedReviews);
+    await _syncReviewToCloud(_cachedReviews[idx]);
   }
 
   /// @deprecated — [upsertMonthlyReview] 사용
@@ -311,6 +325,61 @@ class LocalStoryArcService {
     }
   }
 
+  StoryArcBundle _bundleWithReviews(
+    StoryArcBundle bundle,
+    List<MonthlyReview> reviewSnapshots,
+  ) {
+    var reviews = reviewSnapshots;
+    if (reviews.isEmpty) {
+      if (bundle.monthlyReviews.isNotEmpty) {
+        reviews = bundle.monthlyReviews;
+      } else if (bundle.monthlyReview != null) {
+        reviews = [bundle.monthlyReview!];
+      }
+    } else if (bundle.monthlyReviews.isNotEmpty) {
+      reviews = _mergeReviewArchives(reviews, bundle.monthlyReviews);
+    }
+    return StoryArcBundle(
+      arcs: bundle.arcs,
+      mappings: bundle.mappings,
+      lastDiscoveryAt: bundle.lastDiscoveryAt,
+      whisperShownArcIds: bundle.whisperShownArcIds,
+      dailyInsight: bundle.dailyInsight,
+      monthlyReviews: reviews,
+    );
+  }
+
+  Future<void> _migrateLegacyReviewsToCollection(String uid, StoryArcBundle remote) async {
+    final cloudSnapshots = await _monthlyReviews.fetchAll(uid);
+    final cloudKeys = cloudSnapshots.map((r) => r.periodKey).toSet();
+
+    final legacy = remote.monthlyReviews.isNotEmpty
+        ? remote.monthlyReviews
+        : (remote.monthlyReview != null ? [remote.monthlyReview!] : <MonthlyReview>[]);
+
+    final candidates = <MonthlyReview>[...legacy, ..._cachedReviews];
+    final seen = <String>{};
+
+    for (final review in candidates) {
+      if (!seen.add(review.periodKey)) continue;
+      if (cloudKeys.contains(review.periodKey)) continue;
+      try {
+        await _monthlyReviews.upsert(uid, review);
+      } catch (e, st) {
+        debugPrint('LocalStoryArcService: review migration failed — $e\n$st');
+      }
+    }
+  }
+
+  Future<void> _syncReviewToCloud(MonthlyReview review) async {
+    if (!_cloudSyncEnabled || _currentUid == null) return;
+    try {
+      await _monthlyReviews.upsert(_currentUid!, review);
+    } catch (e, st) {
+      debugPrint('LocalStoryArcService: monthly review cloud sync failed — $e\n$st');
+    }
+  }
+
   Future<void> _syncMappingToCloud(StoryArcMapping mapping) async {
     if (!_cloudSyncEnabled || _currentUid == null) return;
     try {
@@ -324,8 +393,6 @@ class LocalStoryArcService {
     DateTime? lastDiscoveryAt,
     Set<String>? whisperShownArcIds,
     DailyInsight? dailyInsight,
-    MonthlyReview? monthlyReview,
-    List<MonthlyReview>? monthlyReviews,
   }) async {
     if (!_cloudSyncEnabled || _currentUid == null) return;
     try {
@@ -334,8 +401,6 @@ class LocalStoryArcService {
         lastDiscoveryAt: lastDiscoveryAt,
         whisperShownArcIds: whisperShownArcIds,
         dailyInsight: dailyInsight,
-        monthlyReview: monthlyReview,
-        monthlyReviews: monthlyReviews ?? _cachedReviews,
       );
     } catch (e, st) {
       debugPrint('LocalStoryArcService: saveMeta cloud failed — $e\n$st');
@@ -416,6 +481,7 @@ class LocalStoryArcService {
     await _ensureLoaded();
     try {
       await _cloud.uploadAll(uid, _localBundle(uid));
+      await _monthlyReviews.uploadAll(uid, _cachedReviews);
     } catch (e, st) {
       debugPrint('LocalStoryArcService: ensureUploadedToCloud failed — $e\n$st');
     }
