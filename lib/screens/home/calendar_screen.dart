@@ -53,6 +53,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return DateTime(_anchorMonth.year, _anchorMonth.month + offset);
   }
 
+  int _pageForMonth(DateTime month) {
+    final offset = (month.year - _anchorMonth.year) * 12 + (month.month - _anchorMonth.month);
+    return _pageAnchor + offset;
+  }
+
+  bool _isViewingCurrentMonth() {
+    final now = DateTime.now();
+    return _focused.year == now.year && _focused.month == now.month;
+  }
+
+  void _goToCurrentMonth() {
+    if (!_monthPageController.hasClients || _isViewingCurrentMonth()) return;
+    final now = DateTime.now();
+    _monthPageController.animateToPage(
+      _pageForMonth(DateTime(now.year, now.month)),
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   void _goToPreviousMonth() {
     if (!_monthPageController.hasClients) return;
     _monthPageController.previousPage(
@@ -94,6 +114,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final today = DateTime.now();
     final monthLabel = DateFormat('yyyy년 M월', 'ko_KR').format(_focused);
     final compact = widget.embedded;
+    final showCurrentMonthButton = !_isViewingCurrentMonth();
 
     final monthPager = PageView.builder(
       controller: _monthPageController,
@@ -145,6 +166,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
             onPrevious: _goToPreviousMonth,
             onNext: _goToNextMonth,
           ),
+          _CurrentMonthButton(
+            visible: showCurrentMonthButton,
+            onTap: _goToCurrentMonth,
+          ),
           const SizedBox(height: 12),
           Expanded(child: monthPager),
         ],
@@ -167,7 +192,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
           ],
         ),
-        body: monthPager,
+        body: Column(
+          children: [
+            _CurrentMonthButton(
+              visible: showCurrentMonthButton,
+              onTap: _goToCurrentMonth,
+            ),
+            Expanded(child: monthPager),
+          ],
+        ),
       ),
     );
   }
@@ -357,6 +390,74 @@ class _MonthHeader extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 다른 달을 보고 있을 때만 표시 — 탭하면 이번 달로 이동
+class _CurrentMonthButton extends StatelessWidget {
+  const _CurrentMonthButton({
+    required this.visible,
+    required this.onTap,
+  });
+
+  final bool visible;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: child,
+      ),
+      child: visible
+          ? Padding(
+              key: const ValueKey('current-month-btn'),
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+              child: Align(
+                alignment: Alignment.center,
+                child: Material(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  elevation: 0,
+                  shadowColor: AppTheme.warmShadow,
+                  borderRadius: BorderRadius.circular(20),
+                  child: InkWell(
+                    onTap: onTap,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppTheme.accent.withValues(alpha: 0.35)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.today_outlined,
+                            size: 16,
+                            color: AppTheme.accent.withValues(alpha: 0.9),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '이번 달',
+                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                  color: AppTheme.accent,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : const SizedBox.shrink(key: ValueKey('current-month-hidden')),
     );
   }
 }
