@@ -181,7 +181,7 @@ class _PhotoStackPreview extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                '$count/$maxPhotos장 · 탭해서 보기',
+                '$count/$maxPhotos장 · 탭해서 삭제·순서',
                 style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
               ),
             )
@@ -460,12 +460,13 @@ class _TodayPhotoGallerySheetState extends State<_TodayPhotoGallerySheet> {
         builder: (ctx) => _PhotoViewerPage(
           entries: _items,
           initialIndex: initialIndex,
+          onDelete: (index) => _removeAt(index, closeViewer: true),
         ),
       ),
     );
   }
 
-  void _removeAt(int index) {
+  void _removeAt(int index, {bool closeViewer = false}) {
     final e = _items[index];
     if (e.isNew) {
       var newIdx = 0;
@@ -478,8 +479,13 @@ class _TodayPhotoGallerySheetState extends State<_TodayPhotoGallerySheet> {
     }
     setState(() {
       _items.removeAt(index);
-      if (_items.isEmpty) Navigator.pop(context);
     });
+    if (closeViewer && mounted) {
+      Navigator.of(context).pop();
+    }
+    if (_items.isEmpty && mounted) {
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -502,7 +508,7 @@ class _TodayPhotoGallerySheetState extends State<_TodayPhotoGallerySheet> {
                       children: [
                         Text('오늘의 장면', style: Theme.of(context).textTheme.titleMedium),
                         Text(
-                          '${_items.length}/${widget.maxPhotos}장',
+                          '${_items.length}/${widget.maxPhotos}장 · ✕로 삭제',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
                         ),
                       ],
@@ -605,7 +611,18 @@ class _TodayPhotoGallerySheetState extends State<_TodayPhotoGallerySheet> {
             ),
           ),
           title: Text('${index + 1}번째 장면', style: const TextStyle(fontSize: 14)),
-          trailing: const Icon(Icons.drag_handle, color: AppTheme.inkMuted),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 22),
+                color: AppTheme.inkMuted,
+                tooltip: '삭제',
+                onPressed: () => _removeAt(index),
+              ),
+              const Icon(Icons.drag_handle, color: AppTheme.inkMuted),
+            ],
+          ),
         );
       },
     );
@@ -678,10 +695,12 @@ class _PhotoViewerPage extends StatefulWidget {
   const _PhotoViewerPage({
     required this.entries,
     required this.initialIndex,
+    this.onDelete,
   });
 
   final List<_TodayPhotoEntry> entries;
   final int initialIndex;
+  final ValueChanged<int>? onDelete;
 
   @override
   State<_PhotoViewerPage> createState() => _PhotoViewerPageState();
@@ -712,6 +731,14 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
         title: Text('${_page + 1} / ${widget.entries.length}'),
+        actions: [
+          if (widget.onDelete != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: '이 사진 삭제',
+              onPressed: () => widget.onDelete!(_page),
+            ),
+        ],
       ),
       body: PageView.builder(
         controller: _controller,

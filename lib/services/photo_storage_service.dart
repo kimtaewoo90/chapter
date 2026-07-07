@@ -81,4 +81,35 @@ class PhotoStorageService {
     return urls;
   }
 
+  /// 해당 날짜 Storage 폴더·URL 기준으로 사진 삭제 (실패 시 무시)
+  Future<void> deletePhotosForEntry({
+    required String userId,
+    required DateTime date,
+    List<String> remoteUrls = const [],
+  }) async {
+    final day = dateKey(date);
+    try {
+      final folder = _storage.ref().child('testUser/$userId/$day');
+      final list = await folder.listAll();
+      for (final item in list.items) {
+        try {
+          await item.delete();
+        } catch (e) {
+          debugPrint('PhotoStorageService delete item failed: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('PhotoStorageService delete folder failed: $e');
+    }
+
+    for (final url in remoteUrls) {
+      if (url.isEmpty) continue;
+      try {
+        await _storage.refFromURL(url).delete();
+      } catch (e) {
+        debugPrint('PhotoStorageService delete url failed: $e');
+      }
+    }
+  }
+
 }

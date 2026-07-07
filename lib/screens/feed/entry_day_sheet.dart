@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/constants/app_fonts.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/delete_entry_dialog.dart';
 import '../../core/utils/entry_diary_ai.dart';
 import '../../core/utils/entry_photos.dart';
 import '../../models/daily_entry.dart';
@@ -64,7 +65,7 @@ class _EntryDaySheetBody extends StatelessWidget {
         children: [
           ListView(
             controller: scrollController,
-            padding: EdgeInsets.fromLTRB(24, 8, 24, onEdit != null ? 80 : 32),
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 88),
             children: [
               Text(dateFmt.format(entry.date), style: textTheme.titleLarge),
               if (entry.moodEmoji != null) ...[
@@ -116,15 +117,48 @@ class _EntryDaySheetBody extends StatelessWidget {
               ],
             ],
           ),
-          if (onEdit != null)
-            Positioned(
-              right: 20,
-              bottom: 32,
-              child: _EditDayFab(onPressed: onEdit!),
+          Positioned(
+            left: 20,
+            right: onEdit != null ? 80 : 20,
+            bottom: 32,
+            child: Row(
+              children: [
+                TextButton.icon(
+                  onPressed: () => _confirmAndDelete(context),
+                  icon: Icon(Icons.delete_outline, size: 20, color: Colors.red.shade700),
+                  label: Text(
+                    '이 날 기록 삭제',
+                    style: TextStyle(color: Colors.red.shade700),
+                  ),
+                ),
+                const Spacer(),
+                if (onEdit != null) _EditDayFab(onPressed: onEdit!),
+              ],
             ),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmAndDelete(BuildContext context) async {
+    final ok = await confirmDeleteDiaryEntry(context, entry.date);
+    if (!ok || !context.mounted) return;
+
+    try {
+      await context.read<AppState>().deleteEntry(entry.date);
+      if (!context.mounted) return;
+      final label = DateFormat('M월 d일', 'ko_KR').format(entry.date);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$label 기록을 삭제했어요.')),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('삭제 실패: $e')),
+      );
+    }
   }
 }
 

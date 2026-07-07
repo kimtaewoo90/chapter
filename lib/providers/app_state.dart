@@ -739,6 +739,46 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<void> deleteEntry(DateTime date) async {
+    final uid = _localUid!;
+    final day = DateTime(date.year, date.month, date.day);
+    final existing = entryForDay(day);
+    if (existing == null) return;
+
+    for (final path in existing.localPhotoPaths) {
+      if (path.startsWith('http')) continue;
+      try {
+        final file = File(path);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (e) {
+        debugPrint('Local photo delete failed: $e');
+      }
+    }
+
+    await _entries.deleteEntry(uid: uid, date: day);
+
+    if (cloudSyncEnabled && _auth.isSignedIn) {
+      try {
+        await _cloudEntries.deleteEntry(uid, day);
+        await _photos.deletePhotosForEntry(
+          userId: uid,
+          date: day,
+          remoteUrls: existing.remotePhotoUrls,
+        );
+        lastCloudSyncError = null;
+      } catch (e, st) {
+        debugPrint('Cloud entry delete failed (local deleted): $e\n$st');
+        lastCloudSyncError = e.toString().contains('permission-denied')
+            ? 'Firestore 권한 거부 — 클라우드 삭제 실패 (이 기기에서는 삭제됨)'
+            : '클라우드 삭제 실패 (이 기기에서는 삭제됨)';
+      }
+    }
+
+    notifyListeners();
+  }
+
   /// Firebase Console 설정 후 재시도
   Future<bool> retryCloudAuth() async {
     final user = await _auth.retrySignIn();

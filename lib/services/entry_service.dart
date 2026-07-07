@@ -63,6 +63,11 @@ class EntryService {
     return getEntryForDate(uid, past);
   }
 
+  Future<void> deleteEntry(String uid, DateTime date) async {
+    final docId = DailyEntry.dateKeyFrom(date);
+    await _entries(uid).doc(docId).delete();
+  }
+
   /// 로컬에만 있던 기록을 Firestore로 최초 업로드
   Future<void> uploadAll(String uid, List<DailyEntry> entries) async {
     if (entries.isEmpty) return;

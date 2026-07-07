@@ -160,6 +160,23 @@ class LocalEntryService {
     return getEntryForDate(uid, past);
   }
 
+  Future<void> deleteEntry({
+    required String uid,
+    required DateTime date,
+  }) async {
+    await _ensureLoaded();
+    final day = DateTime(date.year, date.month, date.day);
+    _cachedEntries!.removeWhere(
+      (e) =>
+          e.userId == uid &&
+          e.date.year == day.year &&
+          e.date.month == day.month &&
+          e.date.day == day.day,
+    );
+    await _persist();
+    _emit(uid);
+  }
+
   Future<DailyEntry> updateEntryAnalysis({
     required String entryId,
     required List<String> topics,

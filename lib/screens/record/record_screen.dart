@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/diary_limits.dart';
 import '../../core/constants/moods.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/delete_entry_dialog.dart';
 import '../../core/utils/entry_diary_ai.dart';
 import '../../core/utils/entry_photos.dart';
 import '../../core/utils/picked_photo_processor.dart';
@@ -63,6 +64,7 @@ class _RecordScreenState extends State<RecordScreen> {
   String? _moodEmoji;
   String? _moodLabel;
   bool _saving = false;
+  bool _deleting = false;
   RecordSaveStep _saveStep = RecordSaveStep.preparingPhotos;
   bool _saveOverlayComplete = false;
   bool _savedAnim = false;
@@ -648,6 +650,31 @@ class _RecordScreenState extends State<RecordScreen> {
     }
   }
 
+  Future<void> _deleteEntry(DailyEntry entry) async {
+    if (_deleting || _saving) return;
+    final ok = await confirmDeleteDiaryEntry(context, entry.date);
+    if (!ok || !mounted) return;
+
+    setState(() => _deleting = true);
+    try {
+      await context.read<AppState>().deleteEntry(entry.date);
+      if (!mounted) return;
+      final label = DateFormat('M월 d일', 'ko_KR').format(entry.date);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$label 기록을 삭제했어요.')),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('삭제 실패: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
@@ -689,6 +716,14 @@ class _RecordScreenState extends State<RecordScreen> {
         appBar: AppBar(
           title: Text(title),
           centerTitle: true,
+          actions: [
+            if (entry != null)
+              IconButton(
+                icon: const Icon(Icons.delete_outline),
+                tooltip: '이 날 기록 삭제',
+                onPressed: (_saving || _deleting) ? null : () => _deleteEntry(entry),
+              ),
+          ],
         ),
         body: DismissKeyboard(
           child: ListView(
@@ -731,7 +766,7 @@ class _RecordScreenState extends State<RecordScreen> {
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     Text(
-                      '최대 ${DiaryLimits.maxPhotosPerEntry}장',
+                      '최대 ${DiaryLimits.maxPhotosPerEntry}장 · 탭하면 삭제·순서 변경',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                             color: AppTheme.inkMuted,
                           ),
@@ -787,7 +822,7 @@ class _RecordScreenState extends State<RecordScreen> {
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: FilledButton(
-              onPressed: _saving ? null : _save,
+              onPressed: _saving || _deleting ? null : _save,
               style: FilledButton.styleFrom(
                 backgroundColor: AppTheme.accent,
                 minimumSize: const Size(double.infinity, 52),
