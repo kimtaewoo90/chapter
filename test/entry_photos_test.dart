@@ -58,6 +58,20 @@ void main() {
       expect(compacted.locals, ['https://a.jpg', '/local/new.jpg']);
       expect(compacted.remotes, ['https://a.jpg', '']);
     });
+
+    test('remote-only entry survives editSlots then compact', () {
+      final slots = EntryPhotos.editSlots(
+        localPaths: const [],
+        remoteUrls: const ['https://a.jpg', 'https://b.jpg'],
+      );
+      final compacted = EntryPhotos.compactPhotoSlots(
+        localPaths: slots.localPaths,
+        remoteUrls: slots.remoteUrls,
+      );
+
+      expect(compacted.locals, ['https://a.jpg', 'https://b.jpg']);
+      expect(compacted.remotes, ['https://a.jpg', 'https://b.jpg']);
+    });
   });
 
   group('DailyEntry remote photo parsing', () {

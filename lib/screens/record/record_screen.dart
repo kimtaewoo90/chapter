@@ -542,12 +542,35 @@ class _RecordScreenState extends State<RecordScreen> {
       }
 
       _keptLocalPaths = [for (final i in orderedIndices) _keptLocalPaths[i]];
-      _keptRemoteUrls = [for (final i in orderedIndices.where((i) => i < _keptRemoteUrls.length)) _keptRemoteUrls[i]];
+      _keptRemoteUrls = [
+        for (final i in orderedIndices)
+          i < _keptRemoteUrls.length ? _keptRemoteUrls[i] : '',
+      ];
 
       _newPhotoFiles
         ..clear()
         ..addAll(reorderedNewFiles);
     });
+  }
+
+  ({List<String> localPaths, List<String> remoteUrls}) _photoSlotsForSave(DailyEntry? entry) {
+    if (_photosEdited || _newPhotoFiles.isNotEmpty) {
+      final remotes = List<String>.from(_keptRemoteUrls);
+      while (remotes.length < _keptLocalPaths.length) {
+        remotes.add('');
+      }
+      if (remotes.length > _keptLocalPaths.length) {
+        remotes.removeRange(_keptLocalPaths.length, remotes.length);
+      }
+      return (localPaths: List<String>.from(_keptLocalPaths), remoteUrls: remotes);
+    }
+    if (entry != null) {
+      return EntryPhotos.editSlots(
+        localPaths: entry.localPhotoPaths,
+        remoteUrls: entry.remotePhotoUrls,
+      );
+    }
+    return (localPaths: <String>[], remoteUrls: <String>[]);
   }
 
   Future<void> _save() async {
@@ -562,11 +585,13 @@ class _RecordScreenState extends State<RecordScreen> {
     try {
       final appState = context.read<AppState>();
       final day = _day(appState);
+      final entry = _entryForDay(appState);
+      final photoSlots = _photoSlotsForSave(entry);
       final saved = await appState.saveEntry(
             date: day,
             newPhotoFiles: List.from(_newPhotoFiles),
-            keepLocalPaths: _photosEdited ? _keptLocalPaths : null,
-            keepRemoteUrls: _photosEdited ? _keptRemoteUrls : null,
+            keepLocalPaths: photoSlots.localPaths,
+            keepRemoteUrls: photoSlots.remoteUrls,
             moodEmoji: _moodEmoji,
             moodLabel: _moodLabel,
             note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),

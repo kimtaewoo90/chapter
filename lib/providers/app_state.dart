@@ -562,9 +562,26 @@ class AppState extends ChangeNotifier {
 
     final existing = entryForDay(day);
     final previousLocal = existing?.localPhotoPaths ?? const [];
-    var localPaths = keepLocalPaths != null
-        ? List<String>.from(keepLocalPaths)
-        : List<String>.from(previousLocal);
+
+    final ({List<String> localPaths, List<String> remoteUrls}) photoSlots;
+    if (keepLocalPaths != null) {
+      photoSlots = (
+        localPaths: List<String>.from(keepLocalPaths),
+        remoteUrls: List<String>.from(
+          keepRemoteUrls ?? existing?.remotePhotoUrls ?? const [],
+        ),
+      );
+    } else if (existing != null) {
+      photoSlots = EntryPhotos.editSlots(
+        localPaths: existing.localPhotoPaths,
+        remoteUrls: existing.remotePhotoUrls,
+      );
+    } else {
+      photoSlots = (localPaths: <String>[], remoteUrls: <String>[]);
+    }
+
+    var localPaths = List<String>.from(photoSlots.localPaths);
+    var remoteUrls = List<String>.from(photoSlots.remoteUrls);
     if (newPhotoFiles.isNotEmpty) {
       localPaths.addAll(await _entries.savePhotosLocal(newPhotoFiles));
     }
@@ -572,10 +589,6 @@ class AppState extends ChangeNotifier {
       localPaths: localPaths,
       saveLocal: _entries.savePhotoLocal,
     );
-
-    var remoteUrls = keepRemoteUrls != null
-        ? List<String>.from(keepRemoteUrls)
-        : List<String>.from(existing?.remotePhotoUrls ?? const []);
     while (remoteUrls.length < localPaths.length) {
       remoteUrls.add('');
     }
