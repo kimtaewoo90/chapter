@@ -172,8 +172,180 @@ class OnboardingChaptersPreview extends StatelessWidget {
   }
 }
 
-/// 하위 호환 — 온보딩 4페이지에서 사용
+/// 하위 호환 — 스토어 스크린샷 등
 typedef OnboardingDiaryListPreview = OnboardingChaptersPreview;
+
+/// 온보딩 — 실물 책 주문 미리보기(정적)
+class OnboardingPhysicalBookPreview extends StatelessWidget {
+  const OnboardingPhysicalBookPreview({super.key});
+
+  static const _steps = [
+    (Icons.edit_note_outlined, '기록 모음'),
+    (Icons.picture_as_pdf_outlined, '책 미리보기'),
+    (Icons.local_shipping_outlined, '집까지 배송'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final year = DateTime.now().year;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: AppTheme.warmShadow, blurRadius: 24, offset: const Offset(0, 8)),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          _BookCoverMock(year: year),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                for (var i = 0; i < _steps.length; i++) ...[
+                  if (i > 0)
+                    Expanded(
+                      child: Container(
+                        height: 1,
+                        margin: const EdgeInsets.only(bottom: 28),
+                        color: AppTheme.paperDark,
+                      ),
+                    ),
+                  Expanded(
+                    child: _DeliveryStep(
+                      icon: _steps[i].$1,
+                      label: _steps[i].$2,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+            child: Text(
+              '한 달치 기록이 쌓이면 주문할 수 있어요.\n날짜순으로 정리된 나만의 책이 도착합니다.',
+              textAlign: TextAlign.center,
+              style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted, height: 1.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BookCoverMock extends StatelessWidget {
+  const _BookCoverMock({required this.year});
+
+  final int year;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 200,
+      margin: const EdgeInsets.symmetric(horizontal: 48),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF5C5048), Color(0xFF8B7355), Color(0xFF4A3F36)],
+        ),
+        boxShadow: const [
+          BoxShadow(color: AppTheme.warmShadow, blurRadius: 24, offset: Offset(8, 14)),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 14,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black.withValues(alpha: 0.25),
+                    Colors.black.withValues(alpha: 0.05),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'CHAPTER',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.75),
+                        letterSpacing: 6,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$year',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w300,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '나의 책',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DeliveryStep extends StatelessWidget {
+  const _DeliveryStep({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: AppTheme.accent.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 22, color: AppTheme.accent),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted),
+        ),
+      ],
+    );
+  }
+}
 
 class _OnboardingPhotoStack extends StatelessWidget {
   const _OnboardingPhotoStack();
