@@ -8,18 +8,13 @@ import 'package:image/image.dart' as img;
 import '../core/config/ai_config.dart';
 import '../core/constants/moods.dart';
 import '../core/utils/ai_narrative.dart';
-import '../core/utils/chapter_open_pool.dart';
 import '../core/utils/entry_diary_ai.dart';
 import '../models/daily_entry.dart';
-import '../models/journal_analysis.dart';
 import '../models/monthly_review.dart';
 import '../models/monthly_review_digest.dart';
-import '../models/story_arc.dart';
-import '../models/story_arc_ai_results.dart';
-import '../models/story_arc_status.dart';
 import 'mood_profile_service.dart';
 
-/// 일기 AI — Gemini Structured JSON + Story Arc 분류 (실패 시 규칙 폴백)
+/// 일기 AI — Gemini (일기 한 줄 · 무드 추천 · 월간 회고)
 class AiJournalService {
   String? lastGeminiError;
 
@@ -56,74 +51,9 @@ class AiJournalService {
     return msg.length > 120 ? '${msg.substring(0, 117)}…' : msg;
   }
 
-  /// Story Memory Layer — 일기 분류 (topics, emotion, importance)
-  Future<JournalAnalysis?> analyzeJournal({
-    required DailyEntry entry,
-    required List<StoryArc> currentArcs,
-    required List<String> recentTopics,
-  }) async {
-    if (!AiConfig.isGeminiConfigured) return null;
-
-    try {
-      final model = _model(maxOutputTokens: 180, temperature: 0.35);
-      final prompt = _buildJournalAnalysisPrompt(
-        entry: entry,
-        currentArcs: currentArcs,
-        recentTopics: recentTopics,
-      );
-      final response = await model.generateContent([Content.text(prompt)]);
-      return _parseJournalAnalysis(response.text ?? '');
-    } catch (e, st) {
-      debugPrint('AiJournalService: analyzeJournal failed — $e\n$st');
-      return null;
-    }
-  }
-
-  /// 기존 Story Arc에 매칭
-  Future<StoryArcMatchResult?> matchStoryArc({
-    required DailyEntry entry,
-    required JournalAnalysis analysis,
-    required List<StoryArc> currentArcs,
-  }) async {
-    if (!AiConfig.isGeminiConfigured || currentArcs.isEmpty) return null;
-
-    try {
-      final model = _model(maxOutputTokens: 160, temperature: 0.3);
-      final prompt = _buildStoryArcMatchPrompt(
-        entry: entry,
-        analysis: analysis,
-        currentArcs: currentArcs,
-      );
-      final response = await model.generateContent([Content.text(prompt)]);
-      return _parseStoryArcMatch(response.text ?? '', currentArcs);
-    } catch (e, st) {
-      debugPrint('AiJournalService: matchStoryArc failed — $e\n$st');
-      return null;
-    }
-  }
-
-  /// 최근 30일 — 신규 Story Arc 발견
-  Future<List<NewStoryArcCandidate>?> discoverNewStoryArcs({
-    required List<DailyEntry> entries,
-    required List<StoryArc> existingArcs,
-  }) async {
-    if (!AiConfig.isGeminiConfigured || entries.length < 5) return null;
-
-    try {
-      final model = _model(maxOutputTokens: 280, temperature: 0.4);
-      final prompt = _buildDiscoveryPrompt(entries: entries, existingArcs: existingArcs);
-      final response = await model.generateContent([Content.text(prompt)]);
-      return _parseDiscovery(response.text ?? '');
-    } catch (e, st) {
-      debugPrint('AiJournalService: discoverNewStoryArcs failed — $e\n$st');
-      return null;
-    }
-  }
-
   /// 월간 리포트 — 팩트 digest 기반 한 줄 회고
   Future<MonthlyReview?> generateMonthlyReview({
     required List<DailyEntry> entries,
-    required List<StoryArc> storyArcs,
     required MonthlyReviewDigest digest,
   }) async {
     if (!AiConfig.isGeminiConfigured || entries.length < 3) return null;
@@ -132,19 +62,11 @@ class AiJournalService {
       final model = _model(maxOutputTokens: 120, temperature: 0.45);
       final prompt = _buildMonthlyReviewPrompt(
         entries: entries,
-        storyArcs: storyArcs,
         digest: digest,
       );
       final response = await model.generateContent([Content.text(prompt)]);
       final reflection = _parseMonthlyReflection(response.text ?? '');
       if (reflection == null || reflection.isEmpty) return null;
-
-      final changes = storyArcs
-          .where((a) => a.status == StoryArcStatus.completed)
-          .map((a) => a.displayTitle)
-          .where((t) => t.isNotEmpty)
-          .take(3)
-          .toList();
 
       return MonthlyReview(
         periodKey: '',
@@ -153,7 +75,6 @@ class AiJournalService {
         topTopics: const [],
         summary: reflection,
         growth: '',
-        chapterChanges: changes,
         digest: digest,
       );
     } catch (e, st) {
@@ -162,162 +83,10 @@ class AiJournalService {
     }
   }
 
-  /// Daily Insight — 한 줄 인사이트
-  Future<String?> generateDailyInsight({
-    required DailyEntry entry,
-    required JournalAnalysis analysis,
-    StoryArc? matchedArc,
-  }) async {
-    if (!AiConfig.isGeminiConfigured) return null;
-
-    try {
-      final model = _model(maxOutputTokens: 80, temperature: 0.6);
-      final arcLine = matchedArc != null
-          ? '연결된 Story Arc: ${matchedArc.displayTitle} (${matchedArc.category})'
-          : '아직 연결된 Story Arc 없음';
-      final prompt = '''
-당신은 일기 앱 CHAPTER의 이야기 발견 도우미입니다. 생성형 작가가 아니라 **분류·연결**만 합니다.
-
-## 오늘 기록
-${_entrySummaryLine(entry)}
-
-## 분류
-- topics: ${analysis.topics.join(', ')}
-- emotion: ${analysis.emotion}
-- importance: ${analysis.importanceScore.toStringAsFixed(2)}
-
-## $arcLine
-
-## 할 일
-사용자에게 보여줄 **Daily Insight 1문장**(60자 이내). 따뜻하고 구체적으로, 클리셰 금지.
-본문만 출력.
-''';
-      final response = await model.generateContent([Content.text(prompt)]);
-      final text = response.text?.trim();
-      if (text != null && text.isNotEmpty) return _cleanModelOutput(text);
-    } catch (e, st) {
-      debugPrint('AiJournalService: generateDailyInsight failed — $e\n$st');
-    }
-    return null;
-  }
-
-  String _buildJournalAnalysisPrompt({
-    required DailyEntry entry,
-    required List<StoryArc> currentArcs,
-    required List<String> recentTopics,
-  }) {
-    final arcsBlock = currentArcs.isEmpty
-        ? '(없음)'
-        : currentArcs
-            .map((a) => '- id:${a.id} category:${a.category} title:${a.displayTitle} status:${a.status.name}')
-            .join('\n');
-    final topicsBlock = recentTopics.isEmpty ? '(없음)' : recentTopics.join(', ');
-
-    return '''
-당신은 일기 **분류기**입니다. 창작하지 마세요.
-
-## Story Memory
-Current Story Arcs:
-$arcsBlock
-
-Recent Topics: $topicsBlock
-
-## New Journal
-${_entrySummaryLine(entry)}
-
-## 출력 (JSON만)
-{
-  "topics": ["career", "job_change"],
-  "emotion": "negative",
-  "importance_score": 0.74
-}
-
-## 규칙
-- topics: 영문 snake_case, 1~3개 (career_change, health_recovery, relationship, startup, travel, study, daily_life 등)
-- emotion: positive | negative | neutral | mixed
-- importance_score: 0.0~1.0
-''';
-  }
-
-  String _buildStoryArcMatchPrompt({
-    required DailyEntry entry,
-    required JournalAnalysis analysis,
-    required List<StoryArc> currentArcs,
-  }) {
-    final arcsBlock = currentArcs
-        .map((a) => '- id:${a.id} category:${a.category} title:${a.displayTitle}')
-        .join('\n');
-
-    return '''
-당신은 일기와 Story Arc **연결** 판단기입니다.
-
-## Current Story Arcs
-$arcsBlock
-
-## New Journal
-${_entrySummaryLine(entry)}
-
-## Analysis
-topics: ${analysis.topics.join(', ')}
-emotion: ${analysis.emotion}
-
-## 출력 (JSON만)
-{
-  "story_arc_id": "기존 id 또는 null",
-  "confidence": 0.92,
-  "new_category": "career_change 또는 null",
-  "new_display_title": "새 arc일 때만 한국어 제목",
-  "new_description": "선택"
-}
-
-## 규칙
-- 기존 arc와 같은 주제면 story_arc_id + confidence
-- 완전히 새 주제면 story_arc_id null + new_category + new_display_title
-- category는 snake_case, display_title은 2~14자 한국어
-''';
-  }
-
-  String _buildDiscoveryPrompt({
-    required List<DailyEntry> entries,
-    required List<StoryArc> existingArcs,
-  }) {
-    final lines = entries.take(20).map(_entrySummaryLine).join('\n');
-    final existing = existingArcs
-        .map((a) => '- ${a.category}: ${a.displayTitle}')
-        .join('\n');
-
-    return '''
-최근 ${entries.length}개 일기에서 **새 Story Arc** 후보를 찾으세요.
-
-## 기존 Arc (중복 제외)
-${existing.isEmpty ? '(없음)' : existing}
-
-## 최근 일기
-$lines
-
-## 조건
-- 동일 주제 반복, 관련 일기 5개 이상, 7일 이상 지속 느낌
-
-## 출력 (JSON 배열만)
-[
-  {
-    "new_story_detected": true,
-    "category": "startup",
-    "title": "창업을 고민하기 시작하다",
-    "confidence": 0.81
-  }
-]
-
-없으면 빈 배열 [].
-''';
-  }
-
   String _buildMonthlyReviewPrompt({
     required List<DailyEntry> entries,
-    required List<StoryArc> storyArcs,
     required MonthlyReviewDigest digest,
   }) {
-    final arcs = storyArcs.map((a) => '${a.displayTitle} (${a.status.label})').join(', ');
     final digestJson = jsonEncode(digest.toJson());
 
     return '''
@@ -328,9 +97,6 @@ $digestJson
 
 ## 기록 일수
 ${entries.length}일
-
-## Story Arcs
-${arcs.isEmpty ? '(없음)' : arcs}
 
 ## 할 일
 위 팩트만 근거로, 사용자가 한 달을 돌아볼 때 도움이 되는 **한국어 1~2문장**(100자 이내)을 씁니다.
@@ -355,108 +121,6 @@ ${arcs.isEmpty ? '(없음)' : arcs}
     }
     final trimmed = _cleanModelOutput(raw.trim());
     return trimmed.isEmpty ? null : trimmed;
-  }
-
-  String _entrySummaryLine(DailyEntry e) {
-    final parts = <String>[
-      '${e.date.month}/${e.date.day}',
-      if (e.moodLabel != null) '무드:${e.moodLabel}',
-      if (e.moodEmoji != null) e.moodEmoji!,
-      if (e.note != null && e.note!.trim().isNotEmpty) e.note!.trim(),
-      if (e.aiLine != null && e.aiLine!.trim().isNotEmpty) e.aiLine!.trim(),
-    ];
-    return parts.join(' ');
-  }
-
-  JournalAnalysis? _parseJournalAnalysis(String raw) {
-    final map = _extractJsonMap(raw);
-    if (map == null) return null;
-    return JournalAnalysis(
-      topics: (map['topics'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .where((e) => e.isNotEmpty)
-              .toList() ??
-          const ['daily_life'],
-      emotion: map['emotion'] as String? ?? 'neutral',
-      importanceScore: (map['importance_score'] as num?)?.toDouble() ??
-          (map['importanceScore'] as num?)?.toDouble() ??
-          0.5,
-    );
-  }
-
-  StoryArcMatchResult? _parseStoryArcMatch(String raw, List<StoryArc> arcs) {
-    final map = _extractJsonMap(raw);
-    if (map == null) return null;
-
-    final id = map['story_arc_id'] as String?;
-    final confidence = (map['confidence'] as num?)?.toDouble() ?? 0.5;
-
-    if (id != null && id.isNotEmpty && arcs.any((a) => a.id == id)) {
-      return StoryArcMatchResult(storyArcId: id, confidence: confidence);
-    }
-
-    final category = map['new_category'] as String?;
-    if (category != null && category.isNotEmpty) {
-      return StoryArcMatchResult(
-        storyArcId: null,
-        confidence: confidence,
-        newCategory: category,
-        newDisplayTitle: map['new_display_title'] as String?,
-        newDescription: map['new_description'] as String?,
-      );
-    }
-
-    return StoryArcMatchResult(storyArcId: null, confidence: confidence);
-  }
-
-  List<NewStoryArcCandidate>? _parseDiscovery(String raw) {
-    var s = raw.trim();
-    if (s.contains('```')) {
-      s = s.replaceFirst(RegExp(r'^```(?:json)?\s*', multiLine: true), '');
-      s = s.replaceFirst(RegExp(r'\s*```$'), '');
-    }
-    final start = s.indexOf('[');
-    final end = s.lastIndexOf(']');
-    if (start < 0 || end <= start) return [];
-
-    try {
-      final list = jsonDecode(s.substring(start, end + 1)) as List<dynamic>;
-      return list.map((item) {
-        final m = item as Map<String, dynamic>;
-        return NewStoryArcCandidate(
-          newStoryDetected: m['new_story_detected'] == true,
-          category: m['category'] as String? ?? 'daily_life',
-          title: m['title'] as String? ?? '새 이야기',
-          confidence: (m['confidence'] as num?)?.toDouble() ?? 0.5,
-        );
-      }).toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  MonthlyReview? _parseMonthlyReview(String raw) {
-    final map = _extractJsonMap(raw);
-    if (map == null) return null;
-
-    return MonthlyReview(
-      periodKey: '',
-      periodLabel: '',
-      generatedAt: DateTime.now(),
-      topTopics: (map['top_topics'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .where((e) => e.isNotEmpty)
-              .toList() ??
-          const [],
-      summary: map['summary'] as String? ?? '',
-      growth: map['growth'] as String? ?? '',
-      emotionTrend: map['emotion_trend'] as String? ?? '',
-      chapterChanges: (map['chapter_changes'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .where((e) => e.isNotEmpty)
-              .toList() ??
-          const [],
-    );
   }
 
   Map<String, dynamic>? _extractJsonMap(String raw) {
@@ -530,184 +194,6 @@ ${arcs.isEmpty ? '(없음)' : arcs}
     }
 
     return AiNarrative.fallbackDailyLine(entry, pastEntries: pastEntries);
-  }
-
-  /// 챕터 제목 — Gemini (메모·무드 기반) → 규칙 폴백
-  Future<String?> generateChapterTitle({
-    required List<DailyEntry> entries,
-  }) async {
-    if (entries.isEmpty) return null;
-
-    if (!AiConfig.isGeminiConfigured) {
-      return null;
-    }
-
-    try {
-      final title = await _generateChapterTitleWithGemini(entries);
-      if (title != null && title.trim().isNotEmpty) {
-        return _cleanChapterTitle(title);
-      }
-    } catch (e, st) {
-      debugPrint('AiJournalService: chapter title failed — $e\n$st');
-    }
-    return null;
-  }
-
-  /// 저장 시 — 챕터에 아직 안 묶인 기록을 보고 봉인할지 판단
-  Future<ChapterSealDecision?> evaluateOpenChapterSeal({
-    required List<DailyEntry> openEntries,
-  }) async {
-    if (openEntries.length < 3 || !AiConfig.isGeminiConfigured) return null;
-
-    try {
-      final model = _model(maxOutputTokens: 220, temperature: 0.45);
-      final prompt = _buildOpenChapterSealPrompt(openEntries);
-      final response = await model.generateContent([Content.text(prompt)]);
-      return _parseSealDecision(response.text ?? '', openEntries);
-    } catch (e, st) {
-      debugPrint('AiJournalService: chapter seal evaluate failed — $e\n$st');
-      return null;
-    }
-  }
-
-  ChapterSealDecision? _parseSealDecision(String raw, List<DailyEntry> openEntries) {
-    var s = raw.trim();
-    if (s.contains('```')) {
-      s = s.replaceFirst(RegExp(r'^```(?:json)?\s*', multiLine: true), '');
-      s = s.replaceFirst(RegExp(r'\s*```$'), '');
-    }
-    final start = s.indexOf('{');
-    final end = s.lastIndexOf('}');
-    if (start < 0 || end <= start) return null;
-
-    try {
-      final map = jsonDecode(s.substring(start, end + 1)) as Map<String, dynamic>;
-      final seal = map['seal'] == true;
-      if (!seal) {
-        return ChapterSealDecision(
-          shouldSeal: false,
-          sealedEntries: const [],
-          remainingEntries: openEntries,
-        );
-      }
-
-      final sorted = [...openEntries]..sort((a, b) => a.date.compareTo(b.date));
-      final through = map['sealThroughIndex'];
-      int lastIndex = sorted.length - 1;
-      if (through is num) {
-        lastIndex = through.round().clamp(2, sorted.length - 1);
-      }
-
-      final sealed = sorted.sublist(0, lastIndex + 1);
-      final remaining = sorted.sublist(lastIndex + 1);
-      if (sealed.length < 3) return null;
-
-      final title = _cleanChapterTitle((map['title'] as String?) ?? '');
-      final summary = (map['summary'] as String?)?.trim();
-
-      return ChapterSealDecision(
-        shouldSeal: true,
-        sealedEntries: sealed,
-        remainingEntries: remaining,
-        title: title.isEmpty ? null : title,
-        summary: summary?.isEmpty ?? true ? null : summary,
-      );
-    } catch (_) {
-      return null;
-    }
-  }
-
-  String _buildOpenChapterSealPrompt(List<DailyEntry> entries) {
-    final sorted = [...entries]..sort((a, b) => a.date.compareTo(b.date));
-    final lines = <String>[];
-    for (var i = 0; i < sorted.length; i++) {
-      final e = sorted[i];
-      final parts = <String>[
-        '#$i ${e.date.month}/${e.date.day}',
-        if (e.moodLabel != null && e.moodLabel!.isNotEmpty) '무드:${e.moodLabel}',
-        if (e.moodEmoji != null) e.moodEmoji!,
-        if (e.note != null && e.note!.trim().isNotEmpty) '메모:${e.note!.trim()}',
-        if (e.location != null && e.location!.trim().isNotEmpty) '장소:${e.location!.trim()}',
-        if (e.hasPhotos) '사진${e.photoCount}',
-      ];
-      lines.add(parts.join(' '));
-    }
-
-    return '''
-당신은 일기 앱 CHAPTER의 챕터 편집자입니다.
-
-## 상황
-아래 ${sorted.length}개의 기록은 **아직 어떤 챕터에도 묶이지 않은** 최근 순간들입니다 (오래된 순).
-사용자가 방금 저장했습니다. 이 묶음을 **지금 챕터로 완성할지**, 아니면 **더 쌓을지** 판단하세요.
-
-## 기록
-${lines.map((l) => '- $l').join('\n')}
-
-## 출력 (JSON만)
-{
-  "seal": true 또는 false,
-  "sealThroughIndex": 숫자 또는 null,
-  "title": "챕터 제목 (seal true일 때)",
-  "summary": "1~2문장 요약 (seal true일 때)"
-}
-
-## 규칙
-- seal false: 아직 같은 이야기가 이어지는 중, 챕터로 닫기 이릅다
-- seal true: 분위기·주제·생활 리듬이 한 덩어리로 느껴지거나, 끝에서 분위기가 바뀌어 앞부분을 닫을 때
-- sealThroughIndex: 0부터 inclusive. null이면 전부 봉인. 맨 끝만 분위기가 바뀌면 끝 제외하고 앞만 봉인
-- 봉인 구간은 최소 3개 기록
-- title 2~12자, 메모·무드에서 구체적 단어. "조용한 여름" 같은 클리셰 금지
-- summary는 따뜻한 회고 톤, 120자 이내
-''';
-  }
-
-  Future<String?> _generateChapterTitleWithGemini(List<DailyEntry> entries) async {
-    final model = _model(maxOutputTokens: 40, temperature: 0.65);
-    final prompt = _buildChapterTitlePrompt(entries);
-    final response = await model.generateContent([Content.text(prompt)]);
-    return response.text;
-  }
-
-  String _buildChapterTitlePrompt(List<DailyEntry> entries) {
-    final lines = <String>[];
-    for (final e in entries.take(10)) {
-      final parts = <String>[
-        '${e.date.month}/${e.date.day}',
-        if (e.moodLabel != null && e.moodLabel!.isNotEmpty) '무드:${e.moodLabel}',
-        if (e.moodEmoji != null) e.moodEmoji!,
-        if (e.note != null && e.note!.trim().isNotEmpty) '메모:${e.note!.trim()}',
-        if (e.location != null && e.location!.trim().isNotEmpty) '장소:${e.location!.trim()}',
-        if (e.hasPhotos) '사진${e.photoCount}장',
-      ];
-      lines.add(parts.join(' '));
-    }
-
-    return '''
-당신은 일기 앱 CHAPTER의 챕터 제목 작가입니다.
-
-## 기록 요약 (${entries.length}일)
-${lines.map((l) => '- $l').join('\n')}
-
-## 할 일
-위 기록 묶음에 어울리는 **챕터 제목 1개**만 출력하세요.
-
-## 규칙
-- 2~12자, 한국어 또는 영문 혼용 가능 (예: SBI 미팅, 카페집중, 3월 출장)
-- 사용자 메모·장소·활동에서 **구체적 단어**를 우선 사용
-- "조용한 여름", "설레던 계절", "비 오던 날" 같은 **시적 클리셰 금지**
-- 따옴표·설명·부제 없이 제목만
-''';
-  }
-
-  String _cleanChapterTitle(String raw) {
-    var s = raw.trim();
-    if (s.contains('```')) {
-      s = s.replaceFirst(RegExp(r'^```\w*\n?'), '').replaceFirst(RegExp(r'\n?```$'), '');
-    }
-    s = s.replaceAll(RegExp(r'^["「『\u201c]|[」』"\u201d]$'), '').trim();
-    final firstLine = s.split('\n').first.trim();
-    if (firstLine.length > 20) return firstLine.substring(0, 18);
-    return firstLine;
   }
 
   Future<List<MoodOption>> _recommendMoodsWithGemini({

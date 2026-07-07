@@ -38,7 +38,7 @@ class HomeScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        state.currentChapterTitle,
+                        state.homeHeadline,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 4),
@@ -268,7 +268,7 @@ class _EmptyTodayCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '사진 한 컷, 무드, 짧은 한 줄이\n챕터의 이야기가 됩니다.',
+                  '사진 한 컷, 무드, 짧은 한 줄이\n한 페이지의 이야기가 됩니다.',
                   textAlign: TextAlign.center,
                   style: textTheme.bodyMedium?.copyWith(color: AppTheme.inkMuted, height: 1.55),
                 ),

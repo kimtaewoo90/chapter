@@ -137,18 +137,6 @@ class AnalyticsService {
         parameters: {'step': step},
       );
 
-  Future<void> logChapterReveal({
-    required String action,
-    String? arcId,
-  }) =>
-      logEvent(
-        'chapter_reveal',
-        parameters: {
-          'action': action,
-          if (arcId != null) 'arc_id': _truncate(arcId, 36),
-        },
-      );
-
   Future<void> logAccountLink(String provider) => logEvent(
         'account_link',
         parameters: {'provider': provider},

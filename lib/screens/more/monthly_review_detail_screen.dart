@@ -118,33 +118,6 @@ class _MonthlyReviewDetailScreenState extends State<MonthlyReviewDetailScreen> {
             ] else ...[
               _LegacyBody(review: _review),
             ],
-            if (_review.chapterChanges.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              _Section(
-                title: '이 달에 완성된 챕터',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: _review.chapterChanges
-                      .map(
-                        (c) => Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.auto_stories_outlined,
-                                size: 16,
-                                color: AppTheme.accent,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(child: Text(c, style: textTheme.bodyMedium)),
-                            ],
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
-            ],
           ],
         ),
       ),

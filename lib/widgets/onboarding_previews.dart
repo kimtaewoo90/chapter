@@ -136,13 +136,13 @@ class OnboardingRecordPreview extends StatelessWidget {
   }
 }
 
-/// 온보딩 — 챕터 탭 카드 미리보기(정적)
+/// 온보딩 — 피드(나의 책) 미리보기(정적)
 class OnboardingChaptersPreview extends StatelessWidget {
   const OnboardingChaptersPreview({super.key});
 
-  static const _chapters = [
-    ('01', '봄의 시작', '2026.03.01 — 2026.03.24', '12일 · 28장', '🌸', Color(0xFFD4C4B0)),
-    ('02', '여름의 조각', '2026.04.02 — 2026.04.18', '8일 · 15장', '🌙', Color(0xFFB8C4D4)),
+  static const _pages = [
+    ('3월 15일', '☕ 여유', '카페 창가, 오후 햇살'),
+    ('3월 14일', '🌿 산책', '동네 공원 한 바퀴'),
   ];
 
   @override
@@ -153,20 +153,17 @@ class OnboardingChaptersPreview extends StatelessWidget {
         SizedBox(
           height: 44,
           child: Center(
-            child: Text('챕터', style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500)),
+            child: Text('나의 책', style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500)),
           ),
         ),
-        ...List.generate(_chapters.length, (i) {
-          final c = _chapters[i];
+        ...List.generate(_pages.length, (i) {
+          final p = _pages[i];
           return Padding(
-            padding: EdgeInsets.fromLTRB(16, i == 0 ? 0 : 0, 16, i == _chapters.length - 1 ? 0 : 12),
-            child: _ChapterCardMock(
-              index: c.$1,
-              title: c.$2,
-              period: c.$3,
-              stats: c.$4,
-              mood: c.$5,
-              coverColor: c.$6,
+            padding: EdgeInsets.fromLTRB(16, i == 0 ? 0 : 0, 16, i == _pages.length - 1 ? 0 : 12),
+            child: _JournalPageMock(
+              dateLabel: p.$1,
+              mood: p.$2,
+              snippet: p.$3,
             ),
           );
         }),
@@ -423,22 +420,16 @@ class _MoodChipMock extends StatelessWidget {
   }
 }
 
-class _ChapterCardMock extends StatelessWidget {
-  const _ChapterCardMock({
-    required this.index,
-    required this.title,
-    required this.period,
-    required this.stats,
+class _JournalPageMock extends StatelessWidget {
+  const _JournalPageMock({
+    required this.dateLabel,
     required this.mood,
-    required this.coverColor,
+    required this.snippet,
   });
 
-  final String index;
-  final String title;
-  final String period;
-  final String stats;
+  final String dateLabel;
   final String mood;
-  final Color coverColor;
+  final String snippet;
 
   @override
   Widget build(BuildContext context) {
@@ -448,42 +439,19 @@ class _ChapterCardMock extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 64,
-              height: 80,
-              decoration: BoxDecoration(
-                color: coverColor,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              alignment: Alignment.center,
-              child: Text(mood, style: const TextStyle(fontSize: 28)),
+            Text(dateLabel, style: textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted)),
+            const SizedBox(height: 6),
+            Text(mood, style: textTheme.titleSmall?.copyWith(color: AppTheme.accent)),
+            const SizedBox(height: 6),
+            Text(
+              snippet,
+              style: textTheme.bodySmall,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Chapter $index',
-                    style: textTheme.labelSmall?.copyWith(color: AppTheme.accent),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '"$title"',
-                    style: textTheme.titleSmall?.copyWith(fontStyle: FontStyle.italic),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(period, style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted, fontSize: 11)),
-                  const SizedBox(height: 4),
-                  Text(stats, style: textTheme.bodySmall?.copyWith(fontSize: 11)),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right, size: 20, color: AppTheme.inkMuted.withValues(alpha: 0.6)),
           ],
         ),
       ),

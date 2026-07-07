@@ -165,7 +165,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
         children: [
           const Spacer(flex: 2),
           Text(
-            '일기를 쓰다 보면,\n챕터가 됩니다',
+            '일기를 쓰다 보면,\n한 권이 쌓입니다',
             textAlign: TextAlign.center,
             style: textTheme.headlineMedium?.copyWith(
               height: 1.45,
@@ -175,7 +175,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
           ).animate().fadeIn(duration: 500.ms),
           const SizedBox(height: 12),
           Text(
-            '어떤 이야기든 괜찮아요.\n쌓이면 내용에 맞춰 챕터로 나뉘고, 한 권이 됩니다.',
+            '어떤 하루든 괜찮아요.\n가볍게 쌓인 페이지가 나중에 한 권이 됩니다.',
             textAlign: TextAlign.center,
             style: textTheme.bodyLarge?.copyWith(
               height: 1.6,
@@ -225,13 +225,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
         children: [
           const Spacer(flex: 1),
           Text(
-            '이렇게 챕터가 돼요',
+            '이렇게 읽어요',
             textAlign: TextAlign.center,
             style: textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
           Text(
-            '기록이 모이면 분위기별로 챕터가 만들어집니다',
+            '날짜순으로 쌓인 페이지를\n책장 넘기듯 볼 수 있어요',
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(color: AppTheme.inkMuted, height: 1.5),
           ),
@@ -250,7 +250,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
           ),
           const SizedBox(height: 12),
           Text(
-            '챕터가 모이면 한 권의 책이 됩니다',
+            '한 해가 끝나면 책으로 남겨요',
             textAlign: TextAlign.center,
             style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
           ),
@@ -280,15 +280,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
   }
 }
 
-/// 기록 → 내용에 맞춰 챕터 구분 → 한 권 완성
+/// 기록 → 날짜순 모음 → 한 권 완성
 class _ChapterFlowVisual extends StatelessWidget {
   const _ChapterFlowVisual({required this.progress});
 
   final double progress;
 
   static const _steps = [
-    ('기록', '어떤 이야기든'),
-    ('챕터', '내용에 맞춰'),
+    ('기록', '어떤 하루든'),
+    ('모음', '날짜순으로'),
     ('한 권', '손에 쥐어'),
   ];
 
@@ -523,20 +523,14 @@ class _FlowNaturalChapters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final showCh1 = progress > 0.28;
-    final showCh2 = progress > 0.48;
-
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _diaryLine('3.12', '☕', opacity: ((progress * 5)).clamp(0.0, 1.0)),
         _diaryLine('3.18', '🌧️', opacity: ((progress * 5) - 0.8).clamp(0.0, 1.0)),
-        if (showCh1)
-          _chapterDivider('Chapter 01', '봄의 시작', ((progress - 0.28) / 0.2).clamp(0.0, 1.0)),
         _diaryLine('4.02', '🌙', opacity: ((progress * 5) - 1.6).clamp(0.0, 1.0)),
-        if (showCh2)
-          _chapterDivider('Chapter 02', '여름의 조각', ((progress - 0.48) / 0.2).clamp(0.0, 1.0)),
+        _diaryLine('4.09', '🌿', opacity: ((progress * 5) - 2.4).clamp(0.0, 1.0)),
       ],
     );
   }
@@ -653,40 +647,6 @@ Widget _diaryLine(String date, String emoji, {required double opacity}) {
                 color: AppTheme.inkMuted.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(1),
               ),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-Widget _chapterDivider(String chapter, String title, double opacity) {
-  return Opacity(
-    opacity: opacity,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        children: [
-          Container(
-            width: 3,
-            height: 20,
-            decoration: BoxDecoration(
-              color: AppTheme.accent.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  chapter,
-                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: AppTheme.accent),
-                ),
-                Text(title, style: const TextStyle(fontSize: 8, color: AppTheme.inkMuted)),
-              ],
             ),
           ),
         ],

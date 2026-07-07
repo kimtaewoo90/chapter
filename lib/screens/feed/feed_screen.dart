@@ -8,7 +8,6 @@ import '../../core/utils/entry_diary_ai.dart';
 import '../../models/daily_entry.dart';
 import '../../providers/app_state.dart';
 import '../../services/analytics_service.dart';
-import '../../widgets/chapter_whisper_banner.dart';
 import '../../widgets/journal_book_page.dart';
 import '../../widgets/paper_background.dart';
 import 'entry_day_sheet.dart';
@@ -29,7 +28,6 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
-  String? _whisperMarkedId;
   late PageController _pageController;
   int _currentPage = 0;
   bool _didAlignToToday = false;
@@ -67,18 +65,6 @@ class _FeedScreenState extends State<FeedScreen> {
     final textTheme = Theme.of(context).textTheme;
     final today = state.todayEntry;
     final showTodayPrompt = _isTodayBlank(today);
-    final whisper = state.chapterWhisper;
-
-    if (whisper != null && whisper.arcId != _whisperMarkedId) {
-      _whisperMarkedId = whisper.arcId;
-      Future<void>.delayed(const Duration(seconds: 8), () {
-        if (!mounted) return;
-        final current = context.read<AppState>().chapterWhisper;
-        if (current?.arcId == whisper.arcId) {
-          context.read<AppState>().markChapterWhisperSeen();
-        }
-      });
-    }
 
     if (entries.isNotEmpty && !_didAlignToToday) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -143,11 +129,6 @@ class _FeedScreenState extends State<FeedScreen> {
           Padding(
             padding: EdgeInsets.fromLTRB(_embedded ? 0 : 16, 4, _embedded ? 0 : 16, 8),
             child: _TodayPagePrompt(onGoToRecord: widget.onGoToRecord),
-          ),
-        if (whisper != null)
-          Padding(
-            padding: EdgeInsets.fromLTRB(_embedded ? 0 : 16, 0, _embedded ? 0 : 16, 8),
-            child: ChapterWhisperBanner(message: whisper.message),
           ),
         Expanded(
           child: entries.isEmpty

@@ -14,34 +14,26 @@ import '../core/constants/dev_flags.dart';
 import '../core/constants/moods.dart';
 import '../core/config/weather_config.dart';
 import '../models/app_version_gate.dart';
-import '../models/chapter_moment.dart';
-import '../models/chapter_model.dart';
 import '../core/constants/diary_limits.dart';
 import '../core/utils/entry_photos.dart';
 import '../models/daily_entry.dart';
 import '../models/daily_insight.dart';
 import '../models/monthly_review.dart';
 import '../models/record_save_step.dart';
-import '../models/story_arc.dart';
-import '../models/story_arc_status.dart';
 import '../models/today_weather.dart';
 import '../models/user_preferences.dart';
-import '../core/utils/ai_narrative.dart';
-import '../core/utils/chapter_segmenter.dart';
 import '../core/utils/monthly_review_digest_builder.dart';
 import '../core/utils/monthly_review_period.dart';
 import '../core/utils/monthly_review_source_hash.dart';
 import '../core/utils/entry_diary_ai.dart';
 import '../services/ai_journal_service.dart';
 import '../services/local_story_arc_service.dart';
-import '../services/story_arc_engine.dart';
+import '../services/entry_insights_engine.dart';
 import '../services/mood_profile_service.dart';
-import '../services/local_chapter_service.dart';
 import '../services/app_version_service.dart';
 import '../services/auth_link_exception.dart';
 import '../services/auth_service.dart';
 import '../services/daily_reminder_service.dart';
-import '../services/chapter_service.dart';
 import '../services/entry_service.dart';
 import '../services/local_entry_service.dart';
 import '../services/photo_storage_service.dart';
@@ -60,45 +52,39 @@ enum LaunchPhase {
 class AppState extends ChangeNotifier {
   AppState({
     required LocalEntryService entries,
-    required LocalChapterService chapters,
     required LocalStoryArcService storyArcs,
     required PhotoStorageService photos,
     required EntryService cloudEntries,
-    required ChapterService cloudChapters,
     AuthService? auth,
     AiJournalService? aiJournal,
     WeatherService? weather,
     DailyReminderService? dailyReminder,
-    StoryArcEngine? storyArcEngine,
+    EntryInsightsEngine? insightsEngine,
     AppVersionService? appVersion,
   })  : _entries = entries,
-        _chapters = chapters,
         _storyArcs = storyArcs,
         _photos = photos,
         _cloudEntries = cloudEntries,
-        _cloudChapters = cloudChapters,
         _auth = auth ?? AuthService(),
         _aiJournal = aiJournal ?? AiJournalService(),
         _weather = weather ?? WeatherService(),
         _dailyReminder = dailyReminder ?? DailyReminderService(),
-        _storyArcEngine = storyArcEngine ??
-            StoryArcEngine(
-              arcs: storyArcs,
+        _insightsEngine = insightsEngine ??
+            EntryInsightsEngine(
+              insights: storyArcs,
               ai: aiJournal ?? AiJournalService(),
             ),
         _appVersion = appVersion ?? AppVersionService();
 
   final LocalEntryService _entries;
-  final LocalChapterService _chapters;
   final LocalStoryArcService _storyArcs;
   final PhotoStorageService _photos;
   final EntryService _cloudEntries;
-  final ChapterService _cloudChapters;
   final AuthService _auth;
   final AiJournalService _aiJournal;
   final WeatherService _weather;
   final DailyReminderService _dailyReminder;
-  final StoryArcEngine _storyArcEngine;
+  final EntryInsightsEngine _insightsEngine;
   final AppVersionService _appVersion;
 
   bool initialized = false;
@@ -112,15 +98,9 @@ class AppState extends ChangeNotifier {
 
   List<DailyEntry> allEntries = [];
   List<MoodOption> customMoods = [];
-  List<ChapterModel> allChapters = [];
-  List<StoryArc> allStoryArcs = [];
-  ChapterSegment? openChapter;
-  StoryArc? primaryActiveArc;
   DailyInsight? latestInsight;
   List<MonthlyReview> archivedMonthlyReviews = [];
   String? pendingMonthlyRevealPeriodKey;
-  ChapterRevealPayload? pendingChapterReveal;
-  ChapterWhisper? chapterWhisper;
   bool geminiConnected = false;
   String? geminiStatusMessage;
   DailyEntry? todayEntry;
@@ -130,8 +110,6 @@ class AppState extends ChangeNotifier {
 
   StreamSubscription? _entrySub;
   bool _weatherFetchInFlight = false;
-  StreamSubscription? _chapterSub;
-  StreamSubscription? _storyArcSub;
   String? _localUid;
   String? _streamUid;
 
@@ -213,26 +191,15 @@ class AppState extends ChangeNotifier {
     return counts;
   }
 
-  String? get feedSubtitle {
-    if (allChapters.isNotEmpty) return '완성된 이야기 ${allChapters.length}개';
-    return '순간을 쌓는 중';
+  String get homeHeadline {
+    if (totalDays > 0) return '순간을 쌓는 중';
+    return 'CHAPTER';
   }
 
-  bool get geminiStoryArcEnabled => AiConfig.isGeminiConfigured && geminiConnected;
+  bool get geminiAiEnabled => AiConfig.isGeminiConfigured && geminiConnected;
 
   /// Gemini 키 존재 여부 (연결 성공과 별개)
   bool get geminiKeyPresent => AiConfig.isGeminiConfigured;
-
-  /// @deprecated — [geminiStoryArcEnabled] 사용
-  bool get geminiChapterAutoEnabled => geminiStoryArcEnabled;
-
-  String get currentChapterTitle => feedSubtitle ?? 'Chapter';
-
-  /// 진행 중 챕터는 UI에 노출하지 않음 — whisper/reveal만 사용
-  bool get hasBackgroundChapter => primaryActiveArc != null;
-
-  List<StoryArc> get activeStoryArcs =>
-      allStoryArcs.where((a) => a.isActive).toList();
 
   List<MoodOption> get personalizedMoods => MoodProfileService.personalized(
         entries: allEntries,
@@ -372,15 +339,12 @@ class AppState extends ChangeNotifier {
 
     customMoods = await MoodProfileService.loadCustomMoods();
     await _entries.loadEntries(uid);
-    await _chapters.loadChapters(uid);
     await _storyArcs.load(uid);
     if (cloudSyncEnabled) {
       await _syncEntriesFromCloud(uid);
-      await _loadChaptersFromCloud(uid);
     }
     _reloadMonthlyReviewArchive();
     latestInsight = _storyArcs.dailyInsight;
-    _refreshChapterWhisper(uid);
     final geminiIssue = AiConfig.geminiConfigIssue;
     if (geminiIssue != null) {
       geminiConnected = false;
@@ -436,8 +400,6 @@ class AppState extends ChangeNotifier {
   void _bindUserStreams(String uid) {
     _streamUid = uid;
     _entrySub?.cancel();
-    _chapterSub?.cancel();
-    _storyArcSub?.cancel();
 
     _entrySub = _entries.watchEntries(uid).listen((list) async {
       if (_streamUid != uid || _localUid != uid) return;
@@ -454,110 +416,8 @@ class AppState extends ChangeNotifier {
       todayEntry = found;
       notifyListeners();
       memoryEntry = await _entries.getOneYearAgo(uid, today);
-      await _syncStoryArcsAndChapters(uid, list, cloudSync: _cloudSyncUid != null);
       notifyListeners();
     });
-
-    _chapterSub = _chapters.watchChapters(uid).listen((list) {
-      if (_streamUid != uid || _localUid != uid) return;
-      allChapters = list;
-      notifyListeners();
-    });
-
-    _storyArcSub = _storyArcs.watchArcs(uid).listen((list) {
-      if (_streamUid != uid || _localUid != uid) return;
-      allStoryArcs = list;
-      primaryActiveArc = _storyArcEngine.primaryActiveArc(uid);
-      _refreshChapterWhisper(uid);
-      notifyListeners();
-    });
-  }
-
-  Future<void> _syncStoryArcsAndChapters(
-    String uid,
-    List<DailyEntry> entries, {
-    bool cloudSync = true,
-  }) async {
-    primaryActiveArc = _storyArcEngine.primaryActiveArc(uid);
-    final openEntries = _storyArcEngine.openEntriesForArc(uid, entries);
-
-    openChapter = openEntries.isEmpty
-        ? null
-        : ChapterSegment(entries: openEntries, isComplete: false);
-
-    final completedArcIds = <String>{};
-    final arcDrafts = <CompletedChapterDraft>[];
-
-    for (final arc in _storyArcs.arcsForUser(uid).where((a) => a.status == StoryArcStatus.completed)) {
-      completedArcIds.add(arc.id);
-      final ids = _storyArcs.entryIdsForArc(arc.id).toSet();
-      final arcEntries = entries.where((e) => ids.contains(e.id)).toList()
-        ..sort((a, b) => a.date.compareTo(b.date));
-      if (arcEntries.isEmpty) continue;
-
-      final segment = ChapterSegment(entries: arcEntries, isComplete: true);
-      arcDrafts.add(
-        CompletedChapterDraft(
-          entries: arcEntries,
-          title: arc.displayTitle,
-          narrative: arc.description ??
-              AiNarrative.chapterNarrative(entries: arcEntries, title: arc.displayTitle),
-          dateRangeKey: segment.dateRangeKey,
-          storyArcId: arc.id,
-          category: arc.category,
-        ),
-      );
-    }
-
-    // Story Arc 이전에 만들어진 챕터 유지
-    final legacyDrafts = allChapters
-        .where((c) => c.storyArcId == null || !completedArcIds.contains(c.storyArcId))
-        .map((c) {
-          final inRange = entries
-              .where((e) {
-                final d = DateTime(e.date.year, e.date.month, e.date.day);
-                final start = DateTime(c.startDate.year, c.startDate.month, c.startDate.day);
-                final end = DateTime(c.endDate.year, c.endDate.month, c.endDate.day);
-                return !d.isBefore(start) && !d.isAfter(end);
-              })
-              .toList()
-            ..sort((a, b) => a.date.compareTo(b.date));
-          if (inRange.isEmpty) return null;
-          return CompletedChapterDraft(
-            entries: inRange,
-            title: c.title,
-            narrative: c.narrative,
-            dateRangeKey:
-                '${DailyEntry.dateKeyFrom(c.startDate)}_${DailyEntry.dateKeyFrom(c.endDate)}',
-            storyArcId: c.storyArcId,
-            category: c.category,
-          );
-        })
-        .whereType<CompletedChapterDraft>()
-        .toList();
-
-    await _chapters.replaceCompletedChapters(uid, [...legacyDrafts, ...arcDrafts]);
-    if (cloudSync) {
-      await _syncChaptersToCloud(uid, [...legacyDrafts, ...arcDrafts]);
-    }
-    _refreshChapterWhisper(uid);
-  }
-
-  Future<void> _loadChaptersFromCloud(String uid) async {
-    if (!_canSyncToCloud(uid)) return;
-    try {
-      final cloud = await _cloudChapters.fetchAllChapters(uid);
-      if (cloud.isEmpty) {
-        final local = allChapters.where((c) => c.userId == uid).toList();
-        if (local.isNotEmpty) {
-          await _syncStoryArcsAndChapters(uid, allEntries);
-        }
-        return;
-      }
-      await _chapters.replaceFromCloud(uid, cloud);
-    } catch (e, st) {
-      debugPrint('AppState: load chapters from cloud failed — $e\n$st');
-    }
   }
 
   /// Firestore → 로컬 병합. DB가 비어 있으면 로컬 기록 업로드.
@@ -576,86 +436,6 @@ class AppState extends ChangeNotifier {
       debugPrint('AppState: sync entries from cloud failed — $e\n$st');
       return allEntries;
     }
-  }
-
-  /// Story Arc 분석 직전 — DB 최신 상태 반영
-  Future<List<DailyEntry>> _refreshCloudDataForAnalysis(String uid) async {
-    if (!_canSyncToCloud(uid)) return allEntries;
-    await _storyArcs.refreshFromCloud(uid);
-    return _syncEntriesFromCloud(uid);
-  }
-
-  Future<void> _syncChaptersToCloud(String uid, List<CompletedChapterDraft> drafts) async {
-    final cloudUid = _cloudSyncUid;
-    if (cloudUid == null || cloudUid != uid) {
-      debugPrint(
-        'AppState: skip chapters cloud sync — '
-        'local=$uid auth=${_auth.uid} cloudSyncEnabled=$cloudSyncEnabled',
-      );
-      return;
-    }
-    try {
-      await _cloudChapters.replaceCompletedChapters(cloudUid, drafts);
-    } catch (e, st) {
-      debugPrint('AppState: sync chapters to cloud failed — $e\n$st');
-      final msg = e.toString().contains('permission-denied')
-          ? 'Firestore 권한 거부 — Firebase Console에 firestore.rules를 배포했는지 확인해 주세요. '
-              '(firebase deploy --only firestore:rules)'
-          : '챕터 클라우드 동기화 실패 (이 기기에는 저장됨)';
-      lastCloudSyncError ??= msg;
-    }
-  }
-
-  void _refreshChapterWhisper(String uid) {
-    chapterWhisper = _storyArcEngine.whisperForPrimaryArc(uid);
-  }
-
-  Future<void> markChapterWhisperSeen() async {
-    final whisper = chapterWhisper;
-    if (whisper == null || _localUid == null) return;
-    await _storyArcs.markWhisperShown(whisper.arcId);
-    notifyListeners();
-  }
-
-  void clearChapterReveal() {
-    pendingChapterReveal = null;
-    notifyListeners();
-  }
-
-  void attachChapterToReveal(ChapterModel chapter) {
-    final reveal = pendingChapterReveal;
-    if (reveal == null || reveal.storyArcId != chapter.storyArcId) return;
-    pendingChapterReveal = reveal.copyWith(chapter: chapter);
-    notifyListeners();
-  }
-
-  /// @deprecated — 챕터는 백그라운드에서 자동 완성됨
-  Future<String?> sealOpenChapterManually({String? title}) async {
-    final uid = _localUid;
-    if (uid == null) return '저장 공간을 불러오지 못했어요.';
-
-    final arc = primaryActiveArc ?? _storyArcEngine.primaryActiveArc(uid);
-    if (arc == null) {
-      return '아직 진행 중인 이야기가 없어요. 기록을 더 쌓아 주세요.';
-    }
-
-    final openEntries = _storyArcEngine.openEntriesForArc(uid, allEntries);
-    if (openEntries.length < StoryArcEngine.minEntriesForGrowing &&
-        openEntries.length < ChapterSegmenter.minEntriesToSeal) {
-      return '기록 ${ChapterSegmenter.minEntriesToSeal}일 이상 쌓인 뒤 마무리할 수 있어요.';
-    }
-
-    final resolvedTitle = title?.trim().isNotEmpty == true
-        ? title!.trim()
-        : (await _aiJournal.generateChapterTitle(entries: openEntries) ??
-            arc.displayTitle);
-
-    await _storyArcEngine.completeArc(arcId: arc.id, displayTitle: resolvedTitle);
-    await _syncStoryArcsAndChapters(uid, allEntries);
-    openChapter = null;
-    primaryActiveArc = _storyArcEngine.primaryActiveArc(uid);
-    notifyListeners();
-    return null;
   }
 
   Future<void> completeOnboarding(UserPreferences prefs) async {
@@ -881,15 +661,11 @@ class AppState extends ChangeNotifier {
     );
 
     onStep?.call(RecordSaveStep.analyzingStory);
-    final entriesForAnalysis = [
-      ...allEntries.where((e) => e.id != localSaved.id),
-      localSaved,
-    ];
-    final processResult = await _storyArcEngine.processEntrySaved(
+    final processResult = await _insightsEngine.processEntrySaved(
       uid: uid,
       entry: localSaved,
       allEntries: [
-        ...entriesForAnalysis.where((e) => e.id != localSaved.id),
+        ...allEntries.where((e) => e.id != localSaved.id),
         localSaved,
       ],
     );
@@ -898,25 +674,8 @@ class AppState extends ChangeNotifier {
       topics: processResult.analysis.topics,
       emotion: processResult.analysis.emotion,
       importanceScore: processResult.analysis.importanceScore,
-      storyArcId: processResult.storyArcId,
     );
     latestInsight = processResult.insight;
-    await _syncStoryArcsAndChapters(uid, [
-      ...allEntries.where((e) => e.id != localSaved.id),
-      localSaved,
-    ]);
-
-    if (processResult.chapterCompleted != null) {
-      await _storyArcs.markWhisperShown(processResult.chapterCompleted!.storyArcId);
-      ChapterModel? matched;
-      for (final c in allChapters) {
-        if (c.storyArcId == processResult.chapterCompleted!.storyArcId) {
-          matched = c;
-          break;
-        }
-      }
-      pendingChapterReveal = processResult.chapterCompleted!.copyWith(chapter: matched);
-    }
     notifyListeners();
 
     if (!cloudSyncEnabled || !_auth.isSignedIn) {
@@ -984,7 +743,6 @@ class AppState extends ChangeNotifier {
     await _entries.loadEntries(_localUid!);
     await _storyArcs.load(_localUid!);
     await _syncEntriesFromCloud(_localUid!);
-    await _loadChaptersFromCloud(_localUid!);
     notifyListeners();
     return true;
   }
@@ -1049,7 +807,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 연결 직후 — 로컬 기록·Arc·챕터를 Firestore에 업로드
+  /// 연결 직후 — 로컬 기록·월간 리포트를 Firestore에 업로드
   Future<void> _pushLocalDataToCloud() async {
     final uid = _localUid;
     if (uid == null || !_canSyncToCloud(uid)) return;
@@ -1060,7 +818,6 @@ class AppState extends ChangeNotifier {
         await _cloudEntries.uploadAll(uid, allEntries);
       }
       await _storyArcs.ensureUploadedToCloud(uid);
-      await _syncStoryArcsAndChapters(uid, allEntries);
       lastCloudSyncError = null;
     } catch (e, st) {
       debugPrint('AppState: pushLocalDataToCloud failed — $e\n$st');
@@ -1122,24 +879,15 @@ class AppState extends ChangeNotifier {
         final cloud = await _cloudEntries.fetchAllEntries(uid);
         imported = await _entries.replaceFromCloud(uid, cloud);
         await _storyArcs.load(uid);
-        await _loadChaptersFromCloud(uid);
-        if (cloud.isNotEmpty) {
-          await _syncStoryArcsAndChapters(uid, cloud);
-        }
       } catch (e, st) {
         debugPrint('Firestore import failed: $e\n$st');
         lastCloudSyncError = '클라우드 불러오기 실패 — 네트워크·로그인을 확인해 주세요.';
         await _entries.loadEntries(uid);
-        await _chapters.loadChapters(uid);
         await _storyArcs.load(uid);
       }
     } else {
       await _entries.loadEntries(uid);
-      await _chapters.loadChapters(uid);
       await _storyArcs.load(uid);
-      if (_canSyncToCloud(uid)) {
-        await _loadChaptersFromCloud(uid);
-      }
     }
 
     notifyListeners();
@@ -1207,7 +955,7 @@ class AppState extends ChangeNotifier {
     final ok = await _aiJournal.pingGemini();
     geminiConnected = ok;
     geminiStatusMessage = ok
-        ? '연결됨 · Story Arc AI 사용 중'
+        ? '연결됨 · AI 일기·월간 회고 사용 중'
         : (_aiJournal.lastGeminiError ?? 'API 호출 실패 — 키·Generative Language API 활성화 확인');
     notifyListeners();
   }
@@ -1252,7 +1000,7 @@ class AppState extends ChangeNotifier {
         continue;
       }
 
-      final review = await _storyArcEngine.generateMonthlyReviewForPeriod(
+      final review = await _insightsEngine.generateMonthlyReviewForPeriod(
         uid: uid,
         year: year,
         month: month,
@@ -1319,7 +1067,7 @@ class AppState extends ChangeNotifier {
     final month = int.tryParse(parts[1]);
     if (year == null || month == null) return null;
 
-    final review = await _storyArcEngine.generateMonthlyReviewForPeriod(
+    final review = await _insightsEngine.generateMonthlyReviewForPeriod(
       uid: uid,
       year: year,
       month: month,
@@ -1388,11 +1136,7 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _entrySub?.cancel();
-    _chapterSub?.cancel();
-    _storyArcSub?.cancel();
     _entries.dispose();
-    _chapters.dispose();
-    _storyArcs.dispose();
     super.dispose();
   }
 }

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'package:chapter/core/constants/app_fonts.dart';
 import 'package:chapter/core/theme/app_theme.dart';
-import 'package:chapter/widgets/chapter_whisper_banner.dart';
 import 'package:chapter/widgets/onboarding_previews.dart';
 import 'package:chapter/widgets/paper_background.dart';
 
@@ -46,15 +45,11 @@ class StoreScreenshotScenes {
         ),
         StoreScreenshotScene(
           fileName: '04_chapter.png',
-          widget: StoreScreenshotFrame(
-            headline: '기록이 모이면, 챕터가',
-            subheadline: 'Story Arc가 이어지면\n한 편의 이야기로 완성돼요',
+          widget: const StoreScreenshotFrame(
+            headline: '한 달을 돌아보며',
+            subheadline: '월간 리포트로\n무드·장소·단어를 정리해요',
             dark: true,
-            body: _ChapterRevealMock(
-              title: '봄의 시작',
-              period: '3월 1일 — 3월 24일',
-              stats: '12일 · 28장 · ☕ 여유',
-            ),
+            body: _InsightScreenBody(),
           ),
         ),
         StoreScreenshotScene(
@@ -111,17 +106,11 @@ class _FeedScreenBody extends StatelessWidget {
               ],
             ),
           ),
-          if (!focusPage) ...[
-            const SizedBox(height: 12),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: ChapterWhisperBanner(message: '「봄의 시작」 — 카페와 산책의 이야기가 이어지고 있어요'),
-            ),
-          ],
+          if (!focusPage) const SizedBox(height: 12),
           const SizedBox(height: 16),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: focusPage ? 12 : 24),
+              padding: EdgeInsets.symmetric(horizontal: focusPage ? 12 : 24),
               child: _JournalPageCard(emphasized: focusPage),
             ),
           ),
@@ -243,82 +232,6 @@ class _RecordScreenBody extends StatelessWidget {
         physics: const NeverScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
         child: OnboardingRecordPreview(compact: false),
-      ),
-    );
-  }
-}
-
-class _ChapterRevealMock extends StatelessWidget {
-  const _ChapterRevealMock({
-    required this.title,
-    required this.period,
-    required this.stats,
-  });
-
-  final String title;
-  final String period;
-  final String stats;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Material(
-      color: Colors.black.withValues(alpha: 0.94),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 56),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.auto_awesome_rounded, size: 64, color: AppTheme.accentLight),
-              const SizedBox(height: 36),
-              Text(
-                'Chapter',
-                style: textTheme.labelLarge?.copyWith(
-                  color: AppTheme.accentLight,
-                  letterSpacing: 8,
-                  fontSize: 26,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                '완성',
-                style: textTheme.displaySmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w300,
-                  letterSpacing: 16,
-                  fontSize: 72,
-                ),
-              ),
-              const SizedBox(height: 40),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 44,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                period,
-                style: textTheme.bodyLarge?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.72),
-                  fontSize: 30,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                stats,
-                style: textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.accentLight,
-                  fontSize: 28,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

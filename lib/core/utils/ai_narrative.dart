@@ -1,7 +1,7 @@
 import '../../models/daily_entry.dart';
 import 'entry_diary_ai.dart';
 
-/// 일기·챕터 문장 — Gemini 실패 시 규칙 폴백 (챕터 제목은 메모·무드 라벨 우선)
+/// 일기 문장 — Gemini 실패 시 규칙 폴백
 class AiNarrative {
   /// API 미설정·오류 시 사용하는 규칙 기반 문장
   static String? fallbackDailyLine(DailyEntry entry, {List<DailyEntry> pastEntries = const []}) {
@@ -61,114 +61,6 @@ class AiNarrative {
     if (hour >= 12 && hour < 17) return 'afternoon';
     if (hour >= 17 && hour < 21) return 'evening';
     return 'night';
-  }
-
-  static String chapterNarrative({
-    required List<DailyEntry> entries,
-    required String title,
-  }) {
-    if (entries.isEmpty) {
-      return '이 챕터는 아직 조용히 시작되고 있어요.';
-    }
-
-    final snippets = entries
-        .map((e) => e.note?.trim())
-        .whereType<String>()
-        .where((n) => n.length >= 4)
-        .take(2)
-        .toList();
-
-    if (snippets.isNotEmpty) {
-      final joined = snippets.map((s) => '「$s」').join(' ');
-      return '$joined\n${entries.length}일의 기록이 「$title」로 묶였어요.';
-    }
-
-    final tone = _ToneProfile.fromPastEntries(entries);
-    return tone.apply('${entries.length}일의 순간이 「$title」라는 이름으로 모였어요.');
-  }
-
-  /// 챕터 제목 — Gemini 우선, 폴백은 무드·짧은 메모·기간
-  static String suggestChapterTitle(List<DailyEntry> entries) {
-    if (entries.isEmpty) return '새 페이지';
-
-    final fromLabel = _titleFromMoodLabels(entries);
-    if (fromLabel != null) return fromLabel;
-
-    final fromNote = _titleFromNotes(entries);
-    if (fromNote != null) return fromNote;
-
-    final fromPlace = _titleFromLocations(entries);
-    if (fromPlace != null) return fromPlace;
-
-    return _titleFromPeriod(entries);
-  }
-
-  /// 메모 전체 문장을 제목으로 쓰지 않음 — 짧은 메모·고유명사만
-  static String? _titleFromNotes(List<DailyEntry> entries) {
-    for (final e in entries) {
-      final note = e.note?.trim();
-      if (note == null || note.isEmpty) continue;
-
-      // 영문 고유명 (SBI, Tokyo …)
-      for (final m in RegExp(r'[A-Za-z][A-Za-z0-9]{1,14}').allMatches(note)) {
-        final w = m.group(0)!;
-        if (w.length >= 2) return w;
-      }
-
-      // 한 줄이 짧고 문장형이 아닐 때만 (카페, 출장, 육아텅 등)
-      final oneLine = note.split(RegExp(r'[\n\r]')).first.trim();
-      if (_isShortTitleCandidate(oneLine)) return oneLine;
-    }
-    return null;
-  }
-
-  static bool _isShortTitleCandidate(String text) {
-    if (text.length < 2 || text.length > 10) return false;
-    if (text.contains('?') || text.contains('…') || text.endsWith('...')) return false;
-    if (RegExp(r'(요|다|까|나|네|지)\??$').hasMatch(text)) return false;
-    return true;
-  }
-
-  static String? _titleFromMoodLabels(List<DailyEntry> entries) {
-    final counts = <String, int>{};
-    for (final e in entries) {
-      final label = e.moodLabel?.trim();
-      if (label == null || label.isEmpty) continue;
-      counts[label] = (counts[label] ?? 0) + 1;
-    }
-    if (counts.isEmpty) return null;
-
-    final top = counts.entries.reduce((a, b) => a.value >= b.value ? a : b);
-    if (top.value >= 2) return top.key;
-    if (entries.length <= 5) return top.key;
-    return null;
-  }
-
-  static String? _titleFromLocations(List<DailyEntry> entries) {
-    final locs = entries
-        .map((e) => e.location?.trim())
-        .whereType<String>()
-        .where((l) => l.isNotEmpty && l.length <= 20)
-        .toList();
-    if (locs.isEmpty) return null;
-    return locs.first;
-  }
-
-  static String _titleFromPeriod(List<DailyEntry> entries) {
-    final start = entries.last.date;
-    final end = entries.first.date;
-    final sy = start.year;
-    final sm = start.month;
-    final ey = end.year;
-    final em = end.month;
-
-    if (sy == ey && sm == em) {
-      return '$sy.${sm.toString().padLeft(2, '0')}';
-    }
-    if (sy == ey) {
-      return '$sy.${sm.toString().padLeft(2, '0')}–${em.toString().padLeft(2, '0')}';
-    }
-    return '${start.year}.${start.month.toString().padLeft(2, '0')} — ${end.year}.${end.month.toString().padLeft(2, '0')}';
   }
 }
 

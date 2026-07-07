@@ -4,10 +4,8 @@ import 'package:provider/provider.dart';
 import '../core/analytics/analytics_route.dart';
 import '../providers/app_state.dart';
 import '../services/analytics_service.dart';
-import '../widgets/chapter_reveal_overlay.dart';
 import '../widgets/monthly_review_reveal_overlay.dart';
 import '../widgets/paper_background.dart';
-import 'chapters/chapter_detail_screen.dart';
 import 'home/home_tab_screen.dart';
 import 'more/monthly_review_detail_screen.dart';
 import 'more/more_screen.dart';
@@ -51,34 +49,6 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  void _onViewRevealedChapter() {
-    final state = context.read<AppState>();
-    final chapter = state.pendingChapterReveal?.chapter;
-    final arcId = state.pendingChapterReveal?.storyArcId;
-    context.read<AnalyticsService>().logChapterReveal(action: 'view', arcId: arcId);
-    state.clearChapterReveal();
-    if (chapter != null && mounted) {
-      Navigator.of(context).push(
-        analyticsPageRoute(
-          name: 'chapter_detail',
-          builder: (_) => ChapterDetailScreen(chapter: chapter),
-        ),
-      );
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<AppState>().refreshTodayWeatherIfNeeded();
-        context.read<AnalyticsService>().logTabSelect('home');
-        context.read<AnalyticsService>().logScreenView(screenName: 'home');
-      }
-    });
-  }
-
   void _onViewRevealedMonthlyReview() async {
     final state = context.read<AppState>();
     final review = state.pendingMonthlyReveal;
@@ -94,9 +64,20 @@ class _MainShellState extends State<MainShell> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<AppState>().refreshTodayWeatherIfNeeded();
+        context.read<AnalyticsService>().logTabSelect('home');
+        context.read<AnalyticsService>().logScreenView(screenName: 'home');
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final chapterReveal = state.pendingChapterReveal;
     final monthlyReveal = state.pendingMonthlyReveal;
 
     return Scaffold(
@@ -109,19 +90,7 @@ class _MainShellState extends State<MainShell> {
             onGoToRecordForDate: _openRecord,
             onOpenMore: _openMore,
           ),
-          if (chapterReveal != null)
-            Positioned.fill(
-              child: ChapterRevealOverlay(
-                payload: chapterReveal,
-                onDismiss: () {
-                  final arcId = chapterReveal.storyArcId;
-                  context.read<AnalyticsService>().logChapterReveal(action: 'dismiss', arcId: arcId);
-                  context.read<AppState>().clearChapterReveal();
-                },
-                onViewChapter: _onViewRevealedChapter,
-              ),
-            )
-          else if (monthlyReveal != null)
+          if (monthlyReveal != null)
             Positioned.fill(
               child: MonthlyReviewRevealOverlay(
                 review: monthlyReveal,

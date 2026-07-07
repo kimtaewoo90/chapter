@@ -8,7 +8,6 @@ import '../../providers/app_state.dart';
 import '../../core/layout/shell_insets.dart';
 import '../../widgets/paper_background.dart';
 import '../book/book_screen.dart';
-import '../chapters/chapters_screen.dart';
 import 'account_link_screen.dart';
 import 'font_settings_screen.dart';
 import 'monthly_review_screen.dart';
@@ -42,25 +41,10 @@ class MoreScreen extends StatelessWidget {
               photos: state.totalPhotos,
               texts: state.allEntries.where((e) => e.note != null && e.note!.isNotEmpty).length,
               bookProgress: (state.bookProgress * 100).round(),
-              chapterCount: state.allChapters.length,
             ),
             const SizedBox(height: 28),
             _SectionLabel('나의 이야기'),
             const SizedBox(height: 10),
-            _MoreTile(
-              icon: Icons.auto_stories_outlined,
-              title: '완성된 챕터',
-              subtitle: state.allChapters.isEmpty
-                  ? '아직 열린 챕터가 없어요'
-                  : '${state.allChapters.length}개의 이야기',
-              onTap: () => Navigator.push(
-                context,
-                analyticsPageRoute(
-                  name: 'chapters',
-                  builder: (_) => ChaptersScreen(onGoToRecord: () => Navigator.pop(context)),
-                ),
-              ),
-            ),
             _MoreTile(
               icon: Icons.menu_book_outlined,
               title: '내 책',
@@ -269,14 +253,12 @@ class _StatsCard extends StatelessWidget {
     required this.photos,
     required this.texts,
     required this.bookProgress,
-    required this.chapterCount,
   });
 
   final int days;
   final int photos;
   final int texts;
   final int bookProgress;
-  final int chapterCount;
 
   @override
   Widget build(BuildContext context) {
@@ -304,14 +286,8 @@ class _StatsCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(
-                child: Text(
-                  '책 $bookProgress%',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
-                ),
-              ),
               Text(
-                '챕터 $chapterCount개',
+                '책 $bookProgress%',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
               ),
             ],
