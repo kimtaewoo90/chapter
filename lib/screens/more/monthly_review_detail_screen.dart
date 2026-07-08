@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/entry_photos.dart';
+import '../../core/utils/monthly_review_entry_matcher.dart';
+import '../../core/utils/monthly_review_period.dart';
+import '../../models/daily_entry.dart';
 import '../../models/monthly_review.dart';
 import '../../models/monthly_review_digest.dart';
 import '../../providers/app_state.dart';
+import '../../screens/feed/entry_day_sheet.dart';
+import '../../widgets/entry_photo.dart';
+import '../../widgets/entry_photo_viewer.dart';
 import '../../widgets/paper_background.dart';
 
-/// 월간 리포트 상세 — 일기 팩트 스냅샷 회고
+/// 월간 리포트 상세
 class MonthlyReviewDetailScreen extends StatefulWidget {
   const MonthlyReviewDetailScreen({super.key, required this.review});
 
@@ -27,6 +35,19 @@ class _MonthlyReviewDetailScreenState extends State<MonthlyReviewDetailScreen> {
     _review = widget.review;
   }
 
+  List<DailyEntry> _monthEntries(AppState state) {
+    final parts = _review.periodKey.split('-');
+    if (parts.length != 2) return [];
+    final year = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    if (year == null || month == null) return [];
+    return MonthlyReviewPeriod.entriesInMonth(
+      state.allEntries,
+      year: year,
+      month: month,
+    );
+  }
+
   Future<void> _regenerate() async {
     if (_regenerating) return;
     setState(() => _regenerating = true);
@@ -43,11 +64,110 @@ class _MonthlyReviewDetailScreenState extends State<MonthlyReviewDetailScreen> {
     }
   }
 
+  void _openEntriesSheet({
+    required String title,
+    required List<DailyEntry> entries,
+  }) {
+    if (entries.isEmpty) return;
+    final dateFmt = DateFormat('M월 d일 · EEEE', 'ko_KR');
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: AppTheme.paper,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+              child: Text(
+                title,
+                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                itemCount: entries.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final entry = entries[index];
+                  final snippet = entry.note?.trim();
+                  return Material(
+                    color: Colors.white.withValues(alpha: 0.88),
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        showEntryDaySheet(context, entry);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    dateFmt.format(entry.date),
+                                    style: Theme.of(ctx).textTheme.labelMedium?.copyWith(
+                                          color: AppTheme.inkMuted,
+                                        ),
+                                  ),
+                                  if (entry.moodEmoji != null) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      [
+                                        if (entry.moodEmoji != null) entry.moodEmoji!,
+                                        if (entry.moodLabel != null && entry.moodLabel!.isNotEmpty)
+                                          entry.moodLabel!,
+                                      ].join(' '),
+                                      style: Theme.of(ctx).textTheme.bodyMedium,
+                                    ),
+                                  ],
+                                  if (snippet != null && snippet.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      snippet,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                                            color: AppTheme.inkMuted,
+                                            height: 1.4,
+                                          ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right, color: AppTheme.inkMuted, size: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final digest = _review.digest;
     final stale = context.watch<AppState>().isMonthlyReviewStale(_review.periodKey);
+    final monthEntries = _monthEntries(context.watch<AppState>());
 
     return PaperBackground(
       child: Scaffold(
@@ -56,37 +176,47 @@ class _MonthlyReviewDetailScreenState extends State<MonthlyReviewDetailScreen> {
         body: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
           children: [
-            _TimingNote(periodLabel: _review.periodLabel),
             if (stale) ...[
-              const SizedBox(height: 12),
               _StaleBanner(
                 regenerating: _regenerating,
                 onRegenerate: _regenerate,
               ),
+              const SizedBox(height: 16),
             ],
-            const SizedBox(height: 16),
             if (digest != null) ...[
               _StatsRow(digest: digest),
               const SizedBox(height: 16),
-              if (_review.summary.isNotEmpty)
-                _Section(
-                  title: '한 달을 돌아보며',
-                  child: Text(
-                    _review.summary,
-                    style: textTheme.bodyLarge?.copyWith(height: 1.65),
-                  ),
-                ),
-              if (_review.summary.isNotEmpty) const SizedBox(height: 16),
-              if (digest.moods.isNotEmpty)
+              _PhotoStrip(entries: monthEntries),
+              if (digest.moods.isNotEmpty) ...[
+                const SizedBox(height: 16),
                 _FactSection(
-                  title: '가장 많이 찍힌 무드',
+                  title: '무드',
                   icon: Icons.spa_outlined,
                   items: digest.moods,
+                  tappable: true,
+                  onTapItem: (item) => _openEntriesSheet(
+                    title: item.label,
+                    entries: MonthlyReviewEntryMatcher.entriesForMood(monthEntries, item),
+                  ),
                 ),
+              ],
+              if (digest.frequentWords.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _FactSection(
+                  title: '자주 쓴 단어',
+                  icon: Icons.text_fields_outlined,
+                  items: digest.frequentWords,
+                  tappable: true,
+                  onTapItem: (item) => _openEntriesSheet(
+                    title: '「${item.label}」',
+                    entries: MonthlyReviewEntryMatcher.entriesForWord(monthEntries, item),
+                  ),
+                ),
+              ],
               if (digest.places.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 _FactSection(
-                  title: '자주 남긴 장소',
+                  title: '장소',
                   icon: Icons.place_outlined,
                   items: digest.places,
                 ),
@@ -97,14 +227,6 @@ class _MonthlyReviewDetailScreenState extends State<MonthlyReviewDetailScreen> {
                   title: '함께한 사람',
                   icon: Icons.favorite_outline,
                   items: digest.people,
-                ),
-              ],
-              if (digest.words.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                _FactSection(
-                  title: '자주 쓴 단어',
-                  icon: Icons.text_fields_outlined,
-                  items: digest.words,
                 ),
               ],
               if (digest.emotions.isNotEmpty) ...[
@@ -119,6 +241,65 @@ class _MonthlyReviewDetailScreenState extends State<MonthlyReviewDetailScreen> {
               _LegacyBody(review: _review),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PhotoStrip extends StatelessWidget {
+  const _PhotoStrip({required this.entries});
+
+  final List<DailyEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final highlights = <({DailyEntry entry, String uri})>[];
+    for (final entry in entries) {
+      final uris = EntryPhotos.displayUris(
+        localPaths: entry.localPhotoPaths,
+        remoteUrls: entry.remotePhotoUrls,
+      );
+      for (final uri in uris) {
+        highlights.add((entry: entry, uri: uri));
+        if (highlights.length >= 24) break;
+      }
+      if (highlights.length >= 24) break;
+    }
+
+    if (highlights.isEmpty) return const SizedBox.shrink();
+
+    const height = 108.0;
+
+    return _Section(
+      title: '사진',
+      icon: Icons.photo_outlined,
+      child: SizedBox(
+        height: height,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: highlights.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 10),
+          itemBuilder: (context, index) {
+            final item = highlights[index];
+            final allUris = highlights.map((h) => h.uri).toList();
+            return GestureDetector(
+              onTap: () => showEntryPhotoViewer(
+                context,
+                uris: allUris,
+                initialIndex: index,
+              ),
+              onLongPress: () => showEntryDaySheet(context, item.entry),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: height * 0.82,
+                  height: height,
+                  child: EntryPhoto(url: item.uri, height: height, borderRadius: 10),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -148,7 +329,7 @@ class _StaleBanner extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '이 달 일기가 바뀌었어요',
+            '이 달 기록이 바뀌었어요',
             style: Theme.of(context).textTheme.titleSmall,
           ),
           const SizedBox(height: 4),
@@ -168,31 +349,6 @@ class _StaleBanner extends StatelessWidget {
                 : const Text('다시 정리하기'),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _TimingNote extends StatelessWidget {
-  const _TimingNote({required this.periodLabel});
-
-  final String periodLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.accent.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        '$periodLabel이 지난 뒤, 그달 일기만 모아 스냅샷으로 저장했어요.',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.inkMuted,
-              height: 1.5,
-            ),
       ),
     );
   }
@@ -253,11 +409,15 @@ class _FactSection extends StatelessWidget {
     required this.title,
     required this.icon,
     required this.items,
+    this.tappable = false,
+    this.onTapItem,
   });
 
   final String title;
   final IconData icon;
   final List<MonthlyFactItem> items;
+  final bool tappable;
+  final ValueChanged<MonthlyFactItem>? onTapItem;
 
   @override
   Widget build(BuildContext context) {
@@ -270,7 +430,13 @@ class _FactSection extends StatelessWidget {
         children: [
           for (var i = 0; i < items.length; i++) ...[
             if (i > 0) const SizedBox(height: 10),
-            _FactRow(item: items[i], rank: i + 1, textTheme: textTheme),
+            _FactRow(
+              item: items[i],
+              rank: i + 1,
+              textTheme: textTheme,
+              tappable: tappable,
+              onTap: onTapItem == null ? null : () => onTapItem!(items[i]),
+            ),
           ],
         ],
       ),
@@ -283,17 +449,21 @@ class _FactRow extends StatelessWidget {
     required this.item,
     required this.rank,
     required this.textTheme,
+    this.tappable = false,
+    this.onTap,
   });
 
   final MonthlyFactItem item;
   final int rank;
   final TextTheme textTheme;
+  final bool tappable;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final bar = (item.count / 10).clamp(0.12, 1.0);
 
-    return Row(
+    final row = Row(
       children: [
         SizedBox(
           width: 22,
@@ -315,6 +485,10 @@ class _FactRow extends StatelessWidget {
                     '${item.count}번',
                     style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
                   ),
+                  if (tappable) ...[
+                    const SizedBox(width: 4),
+                    Icon(Icons.chevron_right, size: 18, color: AppTheme.inkMuted.withValues(alpha: 0.7)),
+                  ],
                 ],
               ),
               const SizedBox(height: 6),
@@ -332,6 +506,20 @@ class _FactRow extends StatelessWidget {
         ),
       ],
     );
+
+    if (!tappable || onTap == null) return row;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: row,
+        ),
+      ),
+    );
   }
 }
 
@@ -342,17 +530,9 @@ class _LegacyBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
     return Column(
       children: [
-        if (review.summary.isNotEmpty)
-          _Section(
-            title: '한 달 요약',
-            child: Text(review.summary, style: textTheme.bodyLarge),
-          ),
-        if (review.topTopics.isNotEmpty) ...[
-          const SizedBox(height: 16),
+        if (review.topTopics.isNotEmpty)
           _Section(
             title: '주요 주제',
             child: Wrap(
@@ -368,7 +548,6 @@ class _LegacyBody extends StatelessWidget {
                   .toList(),
             ),
           ),
-        ],
       ],
     );
   }

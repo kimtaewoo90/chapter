@@ -84,14 +84,18 @@ class MonthlyReviewDigestBuilder {
 
       final text = _entryText(entry);
       if (text.isNotEmpty) {
-        _accumulatePeople(text, peopleCounts);
-        _accumulateWords(text, wordCounts);
+        _accumulatePeople(text, peopleCounts, entry.id);
+        _accumulateWords(text, wordCounts, entry.id);
       }
     }
 
     final moods = _toRankedList(moodCounts, limit: 5);
     final places = _toRankedList(placeCounts, limit: 5);
-    final words = _toRankedList(wordCounts, limit: 8);
+    final words = _toRankedList(
+      wordCounts,
+      limit: 8,
+      minDistinctEntries: 2,
+    );
     final people = _toRankedList(peopleCounts, limit: 5);
     final emotions = _toRankedList(emotionCounts, limit: 4);
 
@@ -113,6 +117,8 @@ class MonthlyReviewDigestBuilder {
     );
   }
 
+  static String entryText(DailyEntry entry) => _entryText(entry);
+
   static String _entryText(DailyEntry entry) {
     final parts = <String>[];
     final note = entry.note?.trim();
@@ -133,7 +139,7 @@ class MonthlyReviewDigestBuilder {
       if (label != null && label.isNotEmpty) label,
     ].join(' ');
 
-    counts.putIfAbsent(key, () => _RankAccumulator(label: display)).increment();
+    counts.putIfAbsent(key, () => _RankAccumulator(label: display)).record(entry.id);
   }
 
   static void _accumulatePlace(DailyEntry entry, Map<String, _RankAccumulator> counts) {
@@ -141,7 +147,7 @@ class MonthlyReviewDigestBuilder {
     if (raw == null || raw.isEmpty) return;
     final normalized = _normalizePlace(raw);
     if (normalized.isEmpty) return;
-    counts.putIfAbsent(normalized, () => _RankAccumulator(label: normalized)).increment();
+    counts.putIfAbsent(normalized, () => _RankAccumulator(label: normalized)).record(entry.id);
   }
 
   static String _normalizePlace(String raw) {
@@ -177,45 +183,57 @@ class MonthlyReviewDigestBuilder {
     final raw = entry.emotion?.trim().toLowerCase();
     if (raw == null || raw.isEmpty) return;
     final label = _emotionLabels[raw] ?? raw;
-    counts.putIfAbsent(raw, () => _RankAccumulator(label: label)).increment();
+    counts.putIfAbsent(raw, () => _RankAccumulator(label: label)).record(entry.id);
   }
 
-  static void _accumulatePeople(String text, Map<String, _RankAccumulator> counts) {
+  static void _accumulatePeople(String text, Map<String, _RankAccumulator> counts, String entryId) {
     for (final entry in _peopleLexicon.entries) {
       final mapped = entry.value;
       if (mapped == null) continue;
       final matches = entry.key.allMatches(text).length;
       if (matches > 0) {
-        counts.putIfAbsent(mapped, () => _RankAccumulator(label: mapped)).add(matches);
+        counts.putIfAbsent(mapped, () => _RankAccumulator(label: mapped)).record(entryId, matches);
       }
     }
   }
 
-  static void _accumulateWords(String text, Map<String, _RankAccumulator> counts) {
+  static void _accumulateWords(String text, Map<String, _RankAccumulator> counts, String entryId) {
     final cleaned = text
         .replaceAll(RegExp(r'[^\w가-힣\s]'), ' ')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim()
         .toLowerCase();
 
+    final seenInEntry = <String>{};
     for (final token in cleaned.split(' ')) {
       if (token.length < 2) continue;
       if (_stopwords.contains(token)) continue;
       if (RegExp(r'^\d+$').hasMatch(token)) continue;
       if (_peopleLexicon.containsKey(token)) continue;
-      counts.putIfAbsent(token, () => _RankAccumulator(label: token)).increment();
+      if (!seenInEntry.add(token)) continue;
+      counts.putIfAbsent(token, () => _RankAccumulator(label: token)).record(entryId);
     }
   }
 
   static List<MonthlyFactItem> _toRankedList(
     Map<String, _RankAccumulator> counts, {
     required int limit,
+    int minCount = 1,
+    int minDistinctEntries = 1,
   }) {
     final list = counts.values.toList()
       ..sort((a, b) => b.count.compareTo(a.count));
     return list
+        .where((e) => e.count >= minCount && e.entryIds.length >= minDistinctEntries)
         .take(limit)
-        .map((e) => MonthlyFactItem(label: e.label, count: e.count, hint: e.hint))
+        .map(
+          (e) => MonthlyFactItem(
+            label: e.label,
+            count: e.count,
+            hint: e.hint,
+            entryIds: e.entryIds.toList(),
+          ),
+        )
         .toList();
   }
 
@@ -231,14 +249,14 @@ class MonthlyReviewDigestBuilder {
     if (digest.people.isNotEmpty) {
       parts.add('${digest.people.first.label} ${digest.people.first.count}번');
     }
-    if (digest.words.isNotEmpty && parts.length < 3) {
-      parts.add('「${digest.words.first.label}」 ${digest.words.first.count}번');
+    if (digest.frequentWords.isNotEmpty && parts.length < 3) {
+      parts.add('「${digest.frequentWords.first.label}」 ${digest.frequentWords.first.count}번');
     }
 
     if (parts.isEmpty) {
-      return '$periodLabel, ${digest.recordedDays}일의 기록이 남았어요.';
+      return '${digest.recordedDays}일 기록';
     }
-    return '$periodLabel — ${parts.take(3).join(' · ')}.';
+    return parts.take(3).join(' · ');
   }
 }
 
@@ -248,9 +266,12 @@ class _RankAccumulator {
   final String label;
   int count = 0;
   String? hint;
+  final Set<String> entryIds = {};
 
-  void increment() => count++;
-  void add(int n) => count += n;
+  void record(String entryId, [int amount = 1]) {
+    entryIds.add(entryId);
+    count += amount;
+  }
 }
 
 extension _MonthlyReviewDigestCopy on MonthlyReviewDigest {

@@ -4,24 +4,34 @@ class MonthlyFactItem {
     required this.label,
     required this.count,
     this.hint,
+    this.entryIds = const [],
   });
 
   final String label;
   final int count;
   /// 보조 설명 (예: 등장 날짜, 이모지)
   final String? hint;
+  /// 이 팩트가 등장한 일기 id
+  final List<String> entryIds;
 
   Map<String, dynamic> toJson() => {
         'label': label,
         'count': count,
         if (hint != null && hint!.isNotEmpty) 'hint': hint,
+        if (entryIds.isNotEmpty) 'entryIds': entryIds,
       };
 
   factory MonthlyFactItem.fromJson(Map<String, dynamic> json) => MonthlyFactItem(
         label: json['label'] as String? ?? '',
         count: (json['count'] as num?)?.toInt() ?? 0,
         hint: json['hint'] as String?,
+        entryIds: _parseEntryIds(json['entryIds']),
       );
+
+  static List<String> _parseEntryIds(dynamic value) {
+    if (value is! List) return [];
+    return value.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+  }
 }
 
 /// 캘린더 월 일기에서 집계한 팩트 요약
@@ -50,6 +60,16 @@ class MonthlyReviewDigest {
   final List<MonthlyFactItem> emotions;
   /// 팩트만으로 만든 한 줄 (AI 없이도 동작)
   final String factSummary;
+
+  /// 2일 이상에서 등장한 단어만 (한 번만 나온 단어 제외)
+  List<MonthlyFactItem> get frequentWords => words
+      .where((w) => _distinctEntryCount(w) >= 2)
+      .toList();
+
+  static int _distinctEntryCount(MonthlyFactItem item) {
+    if (item.entryIds.isNotEmpty) return item.entryIds.length;
+    return item.count;
+  }
 
   bool get hasFacts =>
       moods.isNotEmpty ||

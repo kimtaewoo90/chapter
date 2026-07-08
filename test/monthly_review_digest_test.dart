@@ -46,7 +46,7 @@ void main() {
       expect(digest.moods.first.count, 2);
       expect(digest.people.any((p) => p.label == '엄마'), isTrue);
       expect(digest.places, isNotEmpty);
-      expect(digest.factSummary, contains('2026년 6월'));
+      expect(digest.factSummary, contains('육아텅'));
     });
 
     test('builds summary from top facts', () {
@@ -68,7 +68,71 @@ void main() {
       );
 
       expect(digest.factSummary, isNotEmpty);
+      expect(digest.factSummary, isNot(contains('2026년 5월')));
       expect(digest.moods.first.count, 3);
+    });
+
+    test('drops words that appear only once', () {
+      final entries = [
+        DailyEntry(
+          id: '1',
+          userId: 'u',
+          date: DateTime(2026, 6, 1),
+          note: '산책 카페',
+        ),
+        DailyEntry(
+          id: '2',
+          userId: 'u',
+          date: DateTime(2026, 6, 2),
+          note: '산책 공원',
+        ),
+        DailyEntry(
+          id: '3',
+          userId: 'u',
+          date: DateTime(2026, 6, 3),
+          note: '집에서 쉼',
+        ),
+      ];
+
+      final digest = MonthlyReviewDigestBuilder.build(
+        entries,
+        periodLabel: '2026년 6월',
+      );
+
+      expect(digest.frequentWords.any((w) => w.label == '산책'), isTrue);
+      expect(digest.frequentWords.any((w) => w.label == '카페'), isFalse);
+      expect(digest.frequentWords.any((w) => w.label == '집에서'), isFalse);
+    });
+
+    test('drops words repeated only within one entry', () {
+      final entries = [
+        DailyEntry(
+          id: '1',
+          userId: 'u',
+          date: DateTime(2026, 6, 1),
+          note: '산책 산책 산책',
+        ),
+        DailyEntry(
+          id: '2',
+          userId: 'u',
+          date: DateTime(2026, 6, 2),
+          note: '집에서 쉼',
+        ),
+        DailyEntry(
+          id: '3',
+          userId: 'u',
+          date: DateTime(2026, 6, 3),
+          note: '공원 산책',
+        ),
+      ];
+
+      final digest = MonthlyReviewDigestBuilder.build(
+        entries,
+        periodLabel: '2026년 6월',
+      );
+
+      expect(digest.frequentWords.any((w) => w.label == '산책'), isTrue);
+      expect(digest.frequentWords.every((w) => w.entryIds.length >= 2), isTrue);
     });
   });
 }

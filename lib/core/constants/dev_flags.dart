@@ -5,7 +5,7 @@ const bool kPreviewSplashOnEveryRestart = kDebugMode;
 
 /// true — 재시작마다 온보딩 (TestFlight·개발 테스트용)
 /// 출시 전 false 로 — SharedPreferences `onboarding_complete` 기준, 최초 1회만
-const bool kPreviewOnboardingOnEveryRestart = true;
+const bool kPreviewOnboardingOnEveryRestart = false;
 
 /// Apple 로그인 UI·네이티브 연동. 유료 Apple Developer + Runner.entitlements에 Sign in with Apple 필요.
 /// Personal Team만 쓸 때: `--dart-define=ENABLE_APPLE_SIGN_IN=false`

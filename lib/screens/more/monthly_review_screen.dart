@@ -206,18 +206,6 @@ class _ReviewListTile extends StatelessWidget {
                         review.periodLabel,
                         style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                       ),
-                      if (review.previewLine.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          review.previewLine,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: AppTheme.inkMuted,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),

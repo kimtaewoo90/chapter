@@ -58,76 +58,28 @@ class _MonthlyReviewRevealOverlayState extends State<MonthlyReviewRevealOverlay>
                       .scale(begin: const Offset(0.6, 0.6), curve: Curves.easeOutBack),
                   const SizedBox(height: 28),
                   Text(
-                    'Monthly',
-                    style: textTheme.labelLarge?.copyWith(
-                      color: AppTheme.accentLight,
-                      letterSpacing: 4,
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(delay: 200.ms, duration: 500.ms)
-                      .slideY(begin: 0.15, curve: Curves.easeOut),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Review',
-                    style: textTheme.displaySmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w300,
-                      letterSpacing: 8,
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(delay: 350.ms, duration: 600.ms)
-                      .scale(begin: const Offset(0.92, 0.92), curve: Curves.easeOut),
-                  const SizedBox(height: 32),
-                  Text(
                     widget.review.periodLabel,
                     textAlign: TextAlign.center,
-                    style: textTheme.headlineSmall?.copyWith(
+                    style: textTheme.headlineMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w600,
                       height: 1.35,
                     ),
                   )
                       .animate()
-                      .fadeIn(delay: 550.ms, duration: 700.ms)
+                      .fadeIn(delay: 250.ms, duration: 700.ms)
                       .slideY(begin: 0.08, curve: Curves.easeOut),
                   const SizedBox(height: 16),
                   Text(
-                    '${widget.review.periodLabel}이 지나갔어요',
+                    '한 달을 돌아볼 준비가 됐어요',
                     textAlign: TextAlign.center,
                     style: textTheme.bodyLarge?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.82),
+                      color: Colors.white.withValues(alpha: 0.78),
                       height: 1.6,
                     ),
                   )
                       .animate()
-                      .fadeIn(delay: 750.ms, duration: 600.ms),
-                  const SizedBox(height: 8),
-                  Text(
-                    '그달 일기를 모아 한 달을 돌아볼 수 있어요',
-                    textAlign: TextAlign.center,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.55),
-                      height: 1.5,
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(delay: 820.ms, duration: 500.ms),
-                  if (widget.review.previewLine.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    Text(
-                      widget.review.previewLine,
-                      textAlign: TextAlign.center,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.72),
-                        fontStyle: FontStyle.italic,
-                        height: 1.65,
-                      ),
-                    )
-                        .animate()
-                        .fadeIn(delay: 900.ms, duration: 600.ms),
-                  ],
+                      .fadeIn(delay: 450.ms, duration: 600.ms),
                   const SizedBox(height: 40),
                   FilledButton(
                     onPressed: widget.onViewReview,
