@@ -5,15 +5,22 @@ import '../core/theme/app_theme.dart';
 
 /// 온보딩 — 실제 기록 화면과 동일한 레이아웃(정적)
 class OnboardingRecordPreview extends StatelessWidget {
-  const OnboardingRecordPreview({super.key, this.compact = true});
+  const OnboardingRecordPreview({
+    super.key,
+    this.compact = true,
+    this.framed = true,
+  });
 
   /// `false` — App Store 스크린샷 등 풀 높이
   final bool compact;
 
+  /// `false` — 온보딩 등에서 흰 박스·높이 제한 없이 본문만
+  final bool framed;
+
   static const _aiMoods = [
     MoodOption('☕', '여유'),
-    MoodOption('🌧️', '촉촉'),
     MoodOption('😌', '편안'),
+    MoodOption('🔥', '몰입'),
   ];
 
   static const _recentMoods = [
@@ -24,8 +31,98 @@ class OnboardingRecordPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final journalHeight = framed ? 108.0 : 200.0;
+    final journalText = framed
+        ? '창가 커피 한 모금.\n오랜만에 친구랑 수다 떨었다.'
+        : '창가 커피 한 모금.\n오랜만에 친구랑 수다 떨었다.\n카페 음악이 잔잔하게 흘렀다.';
+
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 48,
+          child: Center(
+            child: Text(
+              '오늘의 한 페이지',
+              style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            '연필로 적듯, 편하게 남겨 보세요.',
+            style: textTheme.bodySmall?.copyWith(
+              color: AppTheme.inkMuted,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const _OnboardingMoodSection(
+          title: '사진으로 추천',
+          showAiIcon: true,
+          moods: _aiMoods,
+          selectedKey: '☕|여유',
+          highlightAi: true,
+        ),
+        const _OnboardingMoodSection(
+          title: '최근 쓴 무드',
+          moods: _recentMoods,
+        ),
+        _OnboardingMoodSection(
+          title: '오늘의 무드',
+          moods: [kDefaultMoods[0], kDefaultMoods[2], kDefaultMoods[7]],
+          showAddMood: true,
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('오늘의 장면', style: textTheme.titleSmall),
+              Text(
+                '최대 3장 · 탭하면 삭제·순서 변경',
+                style: textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted),
+              ),
+              const SizedBox(height: 10),
+              _OnboardingPhotoStack(tall: !framed),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: _OnboardingJournalMock(
+            text: journalText,
+            height: journalHeight,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, framed ? 14 : 8),
+          child: Container(
+            height: 48,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppTheme.accent,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Text(
+              '이 페이지 저장하기',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (!framed) return body;
+
     return Container(
-      constraints: compact ? const BoxConstraints(maxHeight: 520) : null,
+      constraints: compact ? const BoxConstraints(maxHeight: 580) : null,
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(20),
@@ -34,104 +131,7 @@ class OnboardingRecordPreview extends StatelessWidget {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: 48,
-            child: Center(
-              child: Text(
-                '오늘 기록',
-                style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
-              ),
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('오늘의 사진', style: textTheme.titleSmall),
-                        Text(
-                          '겹쳐 보이는 장면을 탭하면 전체를 볼 수 있어요',
-                          style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
-                        ),
-                        const SizedBox(height: 10),
-                        const _OnboardingPhotoStack(),
-                      ],
-                    ),
-                  ),
-                  const _OnboardingMoodSection(
-                    title: '사진으로 추천',
-                    showAiIcon: true,
-                    moods: _aiMoods,
-                    selectedKey: '☕|여유',
-                    highlightAi: true,
-                  ),
-                  const _OnboardingMoodSection(
-                    title: '최근 쓴 무드',
-                    moods: _recentMoods,
-                  ),
-                  _OnboardingMoodSection(
-                    title: '오늘의 무드',
-                    moods: [kDefaultMoods[0], kDefaultMoods[2], kDefaultMoods[7]],
-                    showAddMood: true,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '창가 커피 한 모금, 비 오는 오후…',
-                        style: textTheme.bodyMedium?.copyWith(color: AppTheme.inkMuted, height: 1.4),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                    child: Row(
-                      children: [
-                        Icon(Icons.cloud_outlined, size: 18, color: AppTheme.inkMuted.withValues(alpha: 0.85)),
-                        const SizedBox(width: 8),
-                        Text(
-                          '흐림 · 18°C',
-                          style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
-            child: Container(
-              height: 44,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppTheme.accent,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Text(
-                '오늘 저장하기',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
-              ),
-            ),
-          ),
-        ],
-      ),
+      child: body,
     );
   }
 }
@@ -177,7 +177,9 @@ typedef OnboardingDiaryListPreview = OnboardingChaptersPreview;
 
 /// 온보딩 — 실물 책 주문 미리보기(정적)
 class OnboardingPhysicalBookPreview extends StatelessWidget {
-  const OnboardingPhysicalBookPreview({super.key});
+  const OnboardingPhysicalBookPreview({super.key, this.framed = true});
+
+  final bool framed;
 
   static const _steps = [
     (Icons.edit_note_outlined, '기록 모음'),
@@ -189,6 +191,77 @@ class OnboardingPhysicalBookPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final year = DateTime.now().year;
+    final coverHeight = framed ? 200.0 : 260.0;
+
+    final body = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(height: framed ? 20 : 8),
+        _BookCoverMock(year: year, height: coverHeight),
+        SizedBox(height: framed ? 20 : 28),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              for (var i = 0; i < _steps.length; i++) ...[
+                if (i > 0)
+                  Expanded(
+                    child: Container(
+                      height: 1,
+                      margin: const EdgeInsets.only(bottom: 28),
+                      color: AppTheme.paperDark,
+                    ),
+                  ),
+                Expanded(
+                  child: _DeliveryStep(
+                    icon: _steps[i].$1,
+                    label: _steps[i].$2,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        Padding(
+          padding: EdgeInsets.fromLTRB(24, 0, 24, framed ? 20 : 12),
+          child: Text(
+            '한 달치 기록이 쌓이면 주문할 수 있어요.\n날짜순으로 정리된 나만의 책이 도착합니다.',
+            textAlign: TextAlign.center,
+            style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted, height: 1.5),
+          ),
+        ),
+        if (!framed) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.paperDark),
+              ),
+              child: Column(
+                children: [
+                  Text('CHAPTER', style: textTheme.labelSmall?.copyWith(letterSpacing: 4, color: AppTheme.inkMuted)),
+                  const SizedBox(height: 6),
+                  Text('실물 책 주문', style: textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(
+                    '미리보기 확인 → 입금 → 제작·배송',
+                    style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+
+    if (!framed) return body;
 
     return Container(
       decoration: BoxDecoration(
@@ -199,59 +272,22 @@ class OnboardingPhysicalBookPreview extends StatelessWidget {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-          _BookCoverMock(year: year),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                for (var i = 0; i < _steps.length; i++) ...[
-                  if (i > 0)
-                    Expanded(
-                      child: Container(
-                        height: 1,
-                        margin: const EdgeInsets.only(bottom: 28),
-                        color: AppTheme.paperDark,
-                      ),
-                    ),
-                  Expanded(
-                    child: _DeliveryStep(
-                      icon: _steps[i].$1,
-                      label: _steps[i].$2,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-            child: Text(
-              '한 달치 기록이 쌓이면 주문할 수 있어요.\n날짜순으로 정리된 나만의 책이 도착합니다.',
-              textAlign: TextAlign.center,
-              style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted, height: 1.5),
-            ),
-          ),
-        ],
-      ),
+      child: body,
     );
   }
 }
 
 class _BookCoverMock extends StatelessWidget {
-  const _BookCoverMock({required this.year});
+  const _BookCoverMock({required this.year, this.height = 200});
 
   final int year;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 200,
-      margin: const EdgeInsets.symmetric(horizontal: 48),
+      height: height,
+      margin: EdgeInsets.symmetric(horizontal: height >= 240 ? 32 : 48),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         gradient: const LinearGradient(
@@ -348,12 +384,14 @@ class _DeliveryStep extends StatelessWidget {
 }
 
 class _OnboardingPhotoStack extends StatelessWidget {
-  const _OnboardingPhotoStack();
+  const _OnboardingPhotoStack({this.tall = false});
+
+  final bool tall;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 140,
+      height: tall ? 168 : 140,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -590,6 +628,90 @@ class _MoodChipMock extends StatelessWidget {
       ),
     );
   }
+}
+
+class _OnboardingJournalMock extends StatelessWidget {
+  const _OnboardingJournalMock({required this.text, this.height = 108});
+
+  final String text;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.ink.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          children: [
+            Positioned.fill(child: CustomPaint(painter: _OnboardingJournalLinesPainter())),
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 12,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppTheme.ink.withValues(alpha: 0.06),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(26, 14, 16, 12),
+              child: Text(
+                text,
+                style: const TextStyle(
+                  fontSize: 16,
+                  height: 1.75,
+                  color: AppTheme.ink,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OnboardingJournalLinesPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFFAF6EE));
+
+    final linePaint = Paint()
+      ..color = AppTheme.accent.withValues(alpha: 0.08)
+      ..strokeWidth = 1;
+    const lineGap = 28.0;
+    final lines = (size.height / lineGap).ceil().clamp(4, 8);
+    for (var i = 0; i < lines; i++) {
+      final y = 20 + i * lineGap;
+      canvas.drawLine(Offset(20, y), Offset(size.width - 8, y), linePaint);
+    }
+
+    final marginPaint = Paint()
+      ..color = const Color(0xFFE8B4B4).withValues(alpha: 0.4)
+      ..strokeWidth = 1.2;
+    canvas.drawLine(const Offset(20, 0), Offset(20, size.height), marginPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _JournalPageMock extends StatelessWidget {

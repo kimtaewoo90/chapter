@@ -124,7 +124,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ).animate().fadeIn(duration: 700.ms).slideY(begin: 0.06, end: 0),
           const SizedBox(height: 20),
           Text(
-            '사진과 한 줄로 가볍게 남기고,\n나중에 손에 쥔 책으로 받아볼 수 있어요.',
+            '사진과 일기로 가볍게 남기고,\n나중에 손에 쥔 책으로 받아볼 수 있어요.',
             textAlign: TextAlign.center,
             style: textTheme.bodyLarge?.copyWith(
               height: 1.65,
@@ -138,13 +138,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _recordPage(TextTheme textTheme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Spacer(flex: 1),
           Text(
-            '사진과 한 줄로\n오늘을 남겨요',
+            '사진과 일기로\n오늘을 남겨요',
             textAlign: TextAlign.center,
             style: textTheme.headlineSmall?.copyWith(
               height: 1.45,
@@ -154,25 +154,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            '무드·날씨까지 — 부담 없이\n하루 한 페이지만 쌓으면 돼요.',
+            '사진, 무드, 글 — 부담 없이\n하루 한 페이지만 쌓으면 돼요.',
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(color: AppTheme.inkMuted, height: 1.55),
           ),
           const SizedBox(height: 20),
-          const Expanded(child: OnboardingRecordPreview()),
-          const SizedBox(height: 8),
-          const Spacer(flex: 1),
+          const OnboardingRecordPreview(framed: false),
         ],
       ),
     );
   }
 
   Widget _physicalBookPage(TextTheme textTheme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Spacer(flex: 1),
           Text(
             '쌓인 기록을\n실물 책으로 받아보세요',
             textAlign: TextAlign.center,
@@ -189,9 +187,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             style: textTheme.bodyMedium?.copyWith(color: AppTheme.inkMuted, height: 1.55),
           ),
           const SizedBox(height: 24),
-          const Expanded(child: OnboardingPhysicalBookPreview()),
-          const SizedBox(height: 8),
-          const Spacer(flex: 1),
+          const OnboardingPhysicalBookPreview(framed: false),
         ],
       ),
     );

@@ -23,7 +23,7 @@ class StoreScreenshotScenes {
           fileName: '01_hero.png',
           widget: const StoreScreenshotFrame(
             headline: '당신의 이야기를,\n한 권의 챕터로',
-            subheadline: '사진·무드·한 줄 — 가볍게 쌓이면\n조용히 한 권이 완성됩니다',
+            subheadline: '사진·무드·일기 — 가볍게 쌓이면\n조용히 한 권이 완성됩니다',
             body: _FeedScreenBody(),
           ),
         ),
