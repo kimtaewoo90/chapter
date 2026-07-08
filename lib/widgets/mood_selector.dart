@@ -16,6 +16,7 @@ class MoodSelector extends StatelessWidget {
     required this.selectedLabel,
     required this.onSelected,
     required this.onAddCustom,
+    this.bookPage = false,
   });
 
   final List<MoodOption> moods;
@@ -26,6 +27,7 @@ class MoodSelector extends StatelessWidget {
   final String? selectedLabel;
   final ValueChanged<MoodOption> onSelected;
   final Future<void> Function(MoodOption mood) onAddCustom;
+  final bool bookPage;
 
   String? get _selectedKey =>
       selectedEmoji == null ? null : '$selectedEmoji|${selectedLabel ?? MoodProfileService.labelForEmoji(selectedEmoji!)}';
@@ -36,19 +38,20 @@ class MoodSelector extends StatelessWidget {
     final recentKeys = recent.map((m) => m.key).toSet();
     final rest = moods.where((m) => !recentKeys.contains(m.key)).toList();
     final hasRecent = recent.isNotEmpty;
+    final hPad = bookPage ? 0.0 : 20.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (loadingAiSuggestions || aiSuggestedMoods.isNotEmpty) ...[
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+            padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 6),
             child: Row(
               children: [
                 Icon(Icons.auto_awesome, size: 14, color: AppTheme.accent.withValues(alpha: 0.85)),
                 const SizedBox(width: 6),
                 Text(
-                  '사진으로 추천',
+                  bookPage ? '사진이 말해요' : '사진으로 추천',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: AppTheme.accent,
                         fontWeight: FontWeight.w600,
@@ -66,9 +69,9 @@ class MoodSelector extends StatelessWidget {
             ),
           ),
           if (loadingAiSuggestions && aiSuggestedMoods.isEmpty)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 8, 20, 12),
-              child: Text('장면을 보고 무드를 고르는 중…', style: TextStyle(fontSize: 11, color: AppTheme.inkMuted)),
+            Padding(
+              padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 12),
+              child: const Text('장면을 보고 무드를 고르는 중…', style: TextStyle(fontSize: 11, color: AppTheme.inkMuted)),
             )
           else
             _MoodRow(
@@ -77,14 +80,15 @@ class MoodSelector extends StatelessWidget {
               onSelected: onSelected,
               onAddCustom: null,
               highlightAi: true,
+              horizontalPadding: hPad,
             ),
-          const SizedBox(height: 10),
+          SizedBox(height: bookPage ? 8 : 10),
         ],
         if (hasRecent) ...[
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+            padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 6),
             child: Text(
-              '최근 쓴 무드',
+              bookPage ? '최근 무드' : '최근 쓴 무드',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted),
             ),
           ),
@@ -93,13 +97,16 @@ class MoodSelector extends StatelessWidget {
             selectedKey: _selectedKey,
             onSelected: onSelected,
             onAddCustom: null,
+            horizontalPadding: hPad,
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: bookPage ? 8 : 10),
         ],
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+          padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 6),
           child: Text(
-            hasRecent ? '오늘의 무드' : '오늘의 무드 · 내 말로 골라요',
+            bookPage
+                ? '무드 골라요'
+                : (hasRecent ? '오늘의 무드' : '오늘의 무드 · 내 말로 골라요'),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted),
           ),
         ),
@@ -108,6 +115,7 @@ class MoodSelector extends StatelessWidget {
           selectedKey: _selectedKey,
           onSelected: onSelected,
           onAddCustom: () => _openAddMood(context),
+          horizontalPadding: hPad,
         ),
       ],
     );
@@ -137,6 +145,7 @@ class _MoodRow extends StatelessWidget {
     required this.onSelected,
     required this.onAddCustom,
     this.highlightAi = false,
+    this.horizontalPadding = 20,
   });
 
   final List<MoodOption> options;
@@ -144,6 +153,7 @@ class _MoodRow extends StatelessWidget {
   final ValueChanged<MoodOption> onSelected;
   final VoidCallback? onAddCustom;
   final bool highlightAi;
+  final double horizontalPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -152,7 +162,7 @@ class _MoodRow extends StatelessWidget {
       height: 76,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
         itemCount: count,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, i) {

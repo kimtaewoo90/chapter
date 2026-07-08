@@ -1,130 +1,263 @@
 import 'package:flutter/material.dart';
 
-import '../core/constants/moods.dart';
+import '../core/constants/app_fonts.dart';
 import '../core/theme/app_theme.dart';
 
-/// 온보딩 — 실제 기록 화면과 동일한 레이아웃(정적)
-class OnboardingRecordPreview extends StatelessWidget {
+/// 온보딩 — 책 한 페이지에 사진·무드·글을 붙이는 쇼케이스
+class OnboardingRecordPreview extends StatefulWidget {
   const OnboardingRecordPreview({
     super.key,
     this.compact = true,
     this.framed = true,
   });
 
-  /// `false` — App Store 스크린샷 등 풀 높이
   final bool compact;
-
-  /// `false` — 온보딩 등에서 흰 박스·높이 제한 없이 본문만
   final bool framed;
 
-  static const _aiMoods = [
-    MoodOption('☕', '여유'),
-    MoodOption('😌', '편안'),
-    MoodOption('🔥', '몰입'),
+  @override
+  State<OnboardingRecordPreview> createState() => _OnboardingRecordPreviewState();
+}
+
+class _OnboardingRecordPreviewState extends State<OnboardingRecordPreview>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  static const _lines = [
+    '창가 커피 한 모금.',
+    '오랜만에 친구랑 수다 떨었다.',
+    '카페 음악이 잔잔하게 흘렀다.',
   ];
 
-  static const _recentMoods = [
-    MoodOption('🙂', '괜찮'),
-    MoodOption('🔥', '몰입'),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3400),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  double _interval(double start, double end) {
+    final t = _c.value;
+    if (t <= start) return 0;
+    if (t >= end) return 1;
+    return ((t - start) / (end - start)).clamp(0.0, 1.0);
+  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final journalHeight = framed ? 108.0 : 200.0;
-    final journalText = framed
-        ? '창가 커피 한 모금.\n오랜만에 친구랑 수다 떨었다.'
-        : '창가 커피 한 모금.\n오랜만에 친구랑 수다 떨었다.\n카페 음악이 잔잔하게 흘렀다.';
+    final pageHeight = widget.framed ? 360.0 : 400.0;
+    final handwriting = diaryFontStyle(kDefaultDiaryFontId, fontSize: 18, height: 1.55);
 
-    final body = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          height: 48,
-          child: Center(
-            child: Text(
-              '오늘의 한 페이지',
-              style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            '연필로 적듯, 편하게 남겨 보세요.',
-            style: textTheme.bodySmall?.copyWith(
-              color: AppTheme.inkMuted,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        const _OnboardingMoodSection(
-          title: '사진으로 추천',
-          showAiIcon: true,
-          moods: _aiMoods,
-          selectedKey: '☕|여유',
-          highlightAi: true,
-        ),
-        const _OnboardingMoodSection(
-          title: '최근 쓴 무드',
-          moods: _recentMoods,
-        ),
-        _OnboardingMoodSection(
-          title: '오늘의 무드',
-          moods: [kDefaultMoods[0], kDefaultMoods[2], kDefaultMoods[7]],
-          showAddMood: true,
-        ),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('오늘의 장면', style: textTheme.titleSmall),
-              Text(
-                '최대 3장 · 탭하면 삭제·순서 변경',
-                style: textTheme.labelSmall?.copyWith(color: AppTheme.inkMuted),
+    final body = AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final pageIn = Curves.easeOutCubic.transform(_interval(0, 0.28));
+        final photosIn = Curves.easeOutBack.transform(_interval(0.12, 0.42));
+        final moodIn = Curves.easeOutCubic.transform(_interval(0.32, 0.52));
+        final line1 = Curves.easeOut.transform(_interval(0.44, 0.58));
+        final line2 = Curves.easeOut.transform(_interval(0.52, 0.66));
+        final line3 = Curves.easeOut.transform(_interval(0.60, 0.74));
+        final chipsIn = Curves.easeOut.transform(_interval(0.72, 0.9));
+        final lineOpacities = [line1, line2, line3];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Transform.translate(
+              offset: Offset(0, (1 - pageIn) * 28),
+              child: Opacity(
+                opacity: pageIn,
+                child: Transform.rotate(
+                  angle: -0.012,
+                  child: Container(
+                    height: pageHeight,
+                    decoration: const BoxDecoration(
+                      borderRadius: BorderRadius.all(Radius.circular(8)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0x302C2824),
+                          blurRadius: 28,
+                          offset: Offset(6, 14),
+                        ),
+                        BoxShadow(
+                          color: Color(0x142C2824),
+                          blurRadius: 8,
+                          offset: Offset(1, 3),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: CustomPaint(painter: _ShowcasePaperPainter()),
+                          ),
+                          Positioned(
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: 16,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppTheme.ink.withValues(alpha: 0.1),
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(26, 22, 18, 20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '3월 8일 · 토요일',
+                                            style: textTheme.labelMedium?.copyWith(
+                                              color: AppTheme.inkMuted,
+                                              letterSpacing: 0.3,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '오늘의 한 페이지',
+                                            style: textTheme.titleSmall?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                              letterSpacing: -0.2,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Transform.scale(
+                                      scale: moodIn,
+                                      child: Opacity(
+                                        opacity: moodIn,
+                                        child: Transform.rotate(
+                                          angle: 0.08,
+                                          child: _MoodStamp(
+                                            emoji: '☕',
+                                            label: '여유',
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 18),
+                                Expanded(
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Transform.scale(
+                                        scale: 0.88 + photosIn * 0.12,
+                                        child: Opacity(
+                                          opacity: photosIn.clamp(0.0, 1.0),
+                                          child: const _ShowcasePolaroidCluster(),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: 0,
+                                        right: 4,
+                                        child: Opacity(
+                                          opacity: moodIn,
+                                          child: Transform.translate(
+                                            offset: Offset((1 - moodIn) * 12, 0),
+                                            child: _AiMoodTag(),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ...List.generate(_lines.length, (i) {
+                                  return Opacity(
+                                    opacity: lineOpacities[i],
+                                    child: Transform.translate(
+                                      offset: Offset(0, (1 - lineOpacities[i]) * 10),
+                                      child: Padding(
+                                        padding: EdgeInsets.only(top: i == 0 ? 0 : 4),
+                                        child: Text(
+                                          _lines[i],
+                                          style: handwriting,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                                const SizedBox(height: 10),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Opacity(
+                                    opacity: chipsIn,
+                                    child: Text(
+                                      'p. 24',
+                                      style: textTheme.labelSmall?.copyWith(
+                                        color: AppTheme.inkMuted.withValues(alpha: 0.65),
+                                        letterSpacing: 1.2,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 10),
-              _OnboardingPhotoStack(tall: !framed),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _OnboardingJournalMock(
-            text: journalText,
-            height: journalHeight,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Padding(
-          padding: EdgeInsets.fromLTRB(20, 0, 20, framed ? 14 : 8),
-          child: Container(
-            height: 48,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppTheme.accent,
-              borderRadius: BorderRadius.circular(14),
             ),
-            child: const Text(
-              '이 페이지 저장하기',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+            const SizedBox(height: 18),
+            Opacity(
+              opacity: chipsIn,
+              child: Transform.translate(
+                offset: Offset(0, (1 - chipsIn) * 8),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _FlowChip(emoji: '📷', label: '사진 붙이기'),
+                    SizedBox(width: 8),
+                    _FlowChip(emoji: '☕', label: '무드 찍기'),
+                    SizedBox(width: 8),
+                    _FlowChip(emoji: '✍️', label: '일기 쓰기'),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
 
-    if (!framed) return body;
+    if (!widget.framed) return body;
 
     return Container(
-      constraints: compact ? const BoxConstraints(maxHeight: 580) : null,
+      constraints: widget.compact ? const BoxConstraints(maxHeight: 520) : null,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.85),
+        color: Colors.white.withValues(alpha: 0.88),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(color: AppTheme.warmShadow, blurRadius: 24, offset: const Offset(0, 8)),
@@ -134,6 +267,177 @@ class OnboardingRecordPreview extends StatelessWidget {
       child: body,
     );
   }
+}
+
+class _ShowcasePolaroidCluster extends StatelessWidget {
+  const _ShowcasePolaroidCluster();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 148,
+      width: 240,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: const [
+          _PolaroidMock(
+            offset: Offset(-38, 10),
+            rotation: -0.14,
+            color: Color(0xFFD4C4B0),
+            width: 88,
+            height: 108,
+          ),
+          _PolaroidMock(
+            offset: Offset(36, 6),
+            rotation: 0.11,
+            color: Color(0xFFB8C4D4),
+            width: 84,
+            height: 104,
+          ),
+          _PolaroidMock(
+            offset: Offset.zero,
+            rotation: -0.02,
+            color: Color(0xFFC9B8A8),
+            width: 96,
+            height: 118,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MoodStamp extends StatelessWidget {
+  const _MoodStamp({required this.emoji, required this.label});
+
+  final String emoji;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(alpha: 0.92),
+        border: Border.all(color: AppTheme.accent.withValues(alpha: 0.55), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.accent.withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 18, height: 1)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.accent,
+              height: 1.1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AiMoodTag extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppTheme.ink.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.auto_awesome, size: 12, color: AppTheme.accentLight),
+          SizedBox(width: 5),
+          Text(
+            '사진이 말해요 → ☕',
+            style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FlowChip extends StatelessWidget {
+  const _FlowChip({required this.emoji, required this.label});
+
+  final String emoji;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.75),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.paperDark),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.ink.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 14)),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.ink,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShowcasePaperPainter extends CustomPainter {
+  static const _paper = Color(0xFFFAF6EE);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = _paper);
+
+    final linePaint = Paint()
+      ..color = AppTheme.accent.withValues(alpha: 0.07)
+      ..strokeWidth = 1;
+    const lineGap = 28.0;
+    for (var y = 72.0; y < size.height - 20; y += lineGap) {
+      canvas.drawLine(Offset(24, y), Offset(size.width - 12, y), linePaint);
+    }
+
+    final marginPaint = Paint()
+      ..color = const Color(0xFFE8B4B4).withValues(alpha: 0.38)
+      ..strokeWidth = 1.2;
+    canvas.drawLine(const Offset(22, 0), Offset(22, size.height), marginPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 /// 온보딩 — 피드(나의 책) 미리보기(정적)
@@ -383,87 +687,20 @@ class _DeliveryStep extends StatelessWidget {
   }
 }
 
-class _OnboardingPhotoStack extends StatelessWidget {
-  const _OnboardingPhotoStack({this.tall = false});
-
-  final bool tall;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: tall ? 168 : 140,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppTheme.ink.withValues(alpha: 0.04),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.paperDark),
-              ),
-              child: Center(
-                child: SizedBox(
-                  width: 200,
-                  height: 118,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    clipBehavior: Clip.none,
-                    children: const [
-                      _PolaroidMock(offset: Offset(-14, 6), rotation: -0.07, color: Color(0xFFE0D5C8)),
-                      _PolaroidMock(offset: Offset(10, -4), rotation: 0.05, color: Color(0xFFC8D0DC)),
-                      _PolaroidMock(offset: Offset.zero, rotation: 0, color: Color(0xFFD8D8D8)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 16,
-            bottom: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppTheme.ink.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                '3장 · 탭해서 보기',
-                style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 12,
-            bottom: 12,
-            child: Material(
-              color: AppTheme.accent,
-              shape: const CircleBorder(),
-              elevation: 2,
-              child: const SizedBox(
-                width: 44,
-                height: 44,
-                child: Icon(Icons.add, color: Colors.white, size: 22),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _PolaroidMock extends StatelessWidget {
   const _PolaroidMock({
     required this.offset,
     required this.rotation,
     required this.color,
+    this.width = 72,
+    this.height = 88,
   });
 
   final Offset offset;
   final double rotation;
   final Color color;
+  final double width;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -472,9 +709,9 @@ class _PolaroidMock extends StatelessWidget {
       child: Transform.rotate(
         angle: rotation,
         child: Container(
-          width: 72,
-          height: 88,
-          padding: const EdgeInsets.fromLTRB(6, 6, 6, 14),
+          width: width,
+          height: height,
+          padding: EdgeInsets.fromLTRB(width * 0.08, width * 0.08, width * 0.08, height * 0.16),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(4),
@@ -496,222 +733,6 @@ class _PolaroidMock extends StatelessWidget {
       ),
     );
   }
-}
-
-class _OnboardingMoodSection extends StatelessWidget {
-  const _OnboardingMoodSection({
-    required this.title,
-    required this.moods,
-    this.showAiIcon = false,
-    this.highlightAi = false,
-    this.selectedKey,
-    this.showAddMood = false,
-  });
-
-  final String title;
-  final List<MoodOption> moods;
-  final bool showAiIcon;
-  final bool highlightAi;
-  final String? selectedKey;
-  final bool showAddMood;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
-          child: Row(
-            children: [
-              if (showAiIcon) ...[
-                Icon(Icons.auto_awesome, size: 14, color: AppTheme.accent.withValues(alpha: 0.85)),
-                const SizedBox(width: 6),
-              ],
-              Text(
-                title,
-                style: textTheme.labelSmall?.copyWith(
-                  color: showAiIcon ? AppTheme.accent : AppTheme.inkMuted,
-                  fontWeight: showAiIcon ? FontWeight.w600 : FontWeight.w400,
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(
-          height: 76,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: moods.length + (showAddMood ? 1 : 0),
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (context, i) {
-              if (showAddMood && i == moods.length) {
-                return Container(
-                  width: 56,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.accent.withValues(alpha: 0.45), width: 1.2),
-                  ),
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add, size: 22, color: AppTheme.accent),
-                      SizedBox(height: 2),
-                      Text('내 무드', style: TextStyle(fontSize: 9, color: AppTheme.accent, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                );
-              }
-              final m = moods[i];
-              final selected = m.key == selectedKey;
-              return _MoodChipMock(mood: m, isSelected: selected, highlightAi: highlightAi);
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MoodChipMock extends StatelessWidget {
-  const _MoodChipMock({
-    required this.mood,
-    required this.isSelected,
-    this.highlightAi = false,
-  });
-
-  final MoodOption mood;
-  final bool isSelected;
-  final bool highlightAi;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        color: isSelected
-            ? AppTheme.accent.withValues(alpha: 0.2)
-            : highlightAi
-                ? AppTheme.accent.withValues(alpha: 0.08)
-                : Colors.white.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isSelected
-              ? AppTheme.accent
-              : highlightAi
-                  ? AppTheme.accent.withValues(alpha: 0.35)
-                  : AppTheme.paperDark.withValues(alpha: 0.6),
-          width: isSelected ? 1.5 : 1,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(mood.emoji, style: const TextStyle(fontSize: 24)),
-          const SizedBox(height: 3),
-          Text(
-            mood.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              color: isSelected ? AppTheme.accent : AppTheme.inkMuted,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OnboardingJournalMock extends StatelessWidget {
-  const _OnboardingJournalMock({required this.text, this.height = 108});
-
-  final String text;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: height,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.ink.withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Stack(
-          children: [
-            Positioned.fill(child: CustomPaint(painter: _OnboardingJournalLinesPainter())),
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: 12,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.ink.withValues(alpha: 0.06),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(26, 14, 16, 12),
-              child: Text(
-                text,
-                style: const TextStyle(
-                  fontSize: 16,
-                  height: 1.75,
-                  color: AppTheme.ink,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _OnboardingJournalLinesPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFFAF6EE));
-
-    final linePaint = Paint()
-      ..color = AppTheme.accent.withValues(alpha: 0.08)
-      ..strokeWidth = 1;
-    const lineGap = 28.0;
-    final lines = (size.height / lineGap).ceil().clamp(4, 8);
-    for (var i = 0; i < lines; i++) {
-      final y = 20 + i * lineGap;
-      canvas.drawLine(Offset(20, y), Offset(size.width - 8, y), linePaint);
-    }
-
-    final marginPaint = Paint()
-      ..color = const Color(0xFFE8B4B4).withValues(alpha: 0.4)
-      ..strokeWidth = 1.2;
-    canvas.drawLine(const Offset(20, 0), Offset(20, size.height), marginPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _JournalPageMock extends StatelessWidget {

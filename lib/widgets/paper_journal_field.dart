@@ -14,6 +14,9 @@ class PaperJournalField extends StatelessWidget {
     this.hintText = '오늘 마음에 남는 것을 적어 보세요…',
     this.minLines = 10,
     this.maxLength = 500,
+    this.embedded = false,
+    this.readOnly = false,
+    this.onTap,
   });
 
   final TextEditingController controller;
@@ -21,6 +24,10 @@ class PaperJournalField extends StatelessWidget {
   final String hintText;
   final int minLines;
   final int maxLength;
+  /// 책 페이지 안에 직접 높일 때 — 바깥 그림자·여백 없음
+  final bool embedded;
+  final bool readOnly;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -31,23 +38,16 @@ class PaperJournalField extends StatelessWidget {
       height: 1.75,
     );
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.ink.withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+    Widget field = ClipRRect(
+      borderRadius: BorderRadius.circular(embedded ? 4 : 8),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _JournalLinesPainter(minLines: minLines, linesOnly: embedded),
+            ),
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Stack(
-          children: [
-            Positioned.fill(child: CustomPaint(painter: _JournalLinesPainter(minLines: minLines))),
+          if (!embedded)
             Positioned(
               left: 0,
               top: 0,
@@ -64,61 +64,97 @@ class PaperJournalField extends StatelessWidget {
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(26, 16, 16, 16),
-              child: TextField(
-                controller: controller,
-                focusNode: focusNode,
-                minLines: minLines,
-                maxLines: null,
-                maxLength: maxLength,
-                style: handwriting,
-                cursorColor: AppTheme.accent,
-                decoration: InputDecoration(
-                  hintText: hintText,
-                  hintStyle: handwriting.copyWith(
-                    color: AppTheme.inkMuted.withValues(alpha: 0.45),
-                  ),
-                  border: InputBorder.none,
-                  counterStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: AppTheme.inkMuted,
-                      ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(embedded ? 4 : 26, embedded ? 8 : 16, embedded ? 0 : 16, embedded ? 8 : 16),
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              readOnly: readOnly,
+              minLines: minLines,
+              maxLines: null,
+              maxLength: maxLength,
+              style: handwriting,
+              cursorColor: AppTheme.accent,
+              decoration: InputDecoration(
+                hintText: hintText,
+                hintStyle: handwriting.copyWith(
+                  color: AppTheme.inkMuted.withValues(alpha: 0.45),
                 ),
+                border: InputBorder.none,
+                counterStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppTheme.inkMuted,
+                    ),
               ),
+              buildCounter: readOnly
+                  ? (_, {required currentLength, required isFocused, required maxLength}) => null
+                  : null,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+
+    if (onTap != null) {
+      field = Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(embedded ? 4 : 8),
+          child: AbsorbPointer(child: field),
+        ),
+      );
+    }
+
+    if (embedded) return field;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.ink.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: field,
     );
   }
 }
 
 class _JournalLinesPainter extends CustomPainter {
-  _JournalLinesPainter({required this.minLines});
+  _JournalLinesPainter({required this.minLines, this.linesOnly = false});
 
   final int minLines;
+  final bool linesOnly;
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFFAF6EE));
+    if (!linesOnly) {
+      canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFFAF6EE));
+    }
 
     final linePaint = Paint()
-      ..color = AppTheme.accent.withValues(alpha: 0.08)
+      ..color = AppTheme.accent.withValues(alpha: linesOnly ? 0.05 : 0.08)
       ..strokeWidth = 1;
     const lineGap = 35.0;
     final lines = (size.height / lineGap).ceil().clamp(minLines, 24);
     for (var i = 0; i < lines; i++) {
       final y = 24 + i * lineGap;
-      canvas.drawLine(Offset(20, y), Offset(size.width - 8, y), linePaint);
+      canvas.drawLine(Offset(linesOnly ? 4 : 20, y), Offset(size.width - 8, y), linePaint);
     }
 
-    final marginPaint = Paint()
-      ..color = const Color(0xFFE8B4B4).withValues(alpha: 0.4)
-      ..strokeWidth = 1.2;
-    canvas.drawLine(const Offset(20, 0), Offset(20, size.height), marginPaint);
+    if (!linesOnly) {
+      final marginPaint = Paint()
+        ..color = const Color(0xFFE8B4B4).withValues(alpha: 0.4)
+        ..strokeWidth = 1.2;
+      canvas.drawLine(const Offset(20, 0), Offset(20, size.height), marginPaint);
+    }
   }
 
   @override
   bool shouldRepaint(covariant _JournalLinesPainter oldDelegate) =>
-      oldDelegate.minLines != minLines;
+      oldDelegate.minLines != minLines || oldDelegate.linesOnly != linesOnly;
 }

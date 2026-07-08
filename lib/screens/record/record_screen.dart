@@ -20,7 +20,9 @@ import '../../providers/app_state.dart';
 import '../../services/analytics_service.dart';
 import '../../services/photo_permission_service.dart';
 import '../../widgets/record_save_overlay.dart';
+import '../../widgets/book_page_shell.dart';
 import '../../widgets/dismiss_keyboard.dart';
+import '../../widgets/journal_write_sheet.dart';
 import '../../widgets/mood_selector.dart';
 import '../../widgets/paper_background.dart';
 import '../../widgets/paper_journal_field.dart';
@@ -50,7 +52,7 @@ class RecordScreen extends StatefulWidget {
 
 class _RecordScreenState extends State<RecordScreen> {
   final _noteController = TextEditingController();
-  final _noteFocusNode = FocusNode();
+  final _journalPreviewFocusNode = FocusNode();
   final _picker = ImagePicker();
 
   DateTime _day(AppState appState) =>
@@ -305,10 +307,15 @@ class _RecordScreenState extends State<RecordScreen> {
     }
   }
 
+  Future<void> _openJournalSheet() async {
+    await showJournalWriteSheet(context, controller: _noteController);
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _moodSuggestDebounce?.cancel();
-    _noteFocusNode.dispose();
+    _journalPreviewFocusNode.dispose();
     _noteController.dispose();
     super.dispose();
   }
@@ -576,7 +583,6 @@ class _RecordScreenState extends State<RecordScreen> {
   }
 
   Future<void> _save() async {
-    _noteFocusNode.unfocus();
     DismissKeyboard.unfocus(context);
 
     setState(() {
@@ -641,7 +647,7 @@ class _RecordScreenState extends State<RecordScreen> {
     } catch (e) {
       setState(() => _saving = false);
       if (mounted) {
-        _noteFocusNode.unfocus();
+        DismissKeyboard.unfocus(context);
         DismissKeyboard.unfocus(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('저장 실패: $e')),
@@ -704,7 +710,8 @@ class _RecordScreenState extends State<RecordScreen> {
     }
 
     final displayUris = _displayPhotoUris(entry);
-    final title = isToday
+    final dateFmt = DateFormat('yyyy년 M월 d일 · EEEE', 'ko_KR');
+    final pageLabel = isToday
         ? '오늘의 한 페이지'
         : DateFormat('M월 d일 기록', 'ko_KR').format(day);
 
@@ -714,7 +721,7 @@ class _RecordScreenState extends State<RecordScreen> {
           Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: Text(title),
+          title: const Text('기록'),
           centerTitle: true,
           actions: [
             if (entry != null)
@@ -728,55 +735,74 @@ class _RecordScreenState extends State<RecordScreen> {
         body: DismissKeyboard(
           child: ListView(
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
             children: [
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text(
-                  '연필로 적듯, 편하게 남겨 보세요.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.inkMuted,
-                        fontStyle: FontStyle.italic,
-                      ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              MoodSelector(
-                moods: context.watch<AppState>().personalizedMoods,
-                recentMoods: context.watch<AppState>().recentMoods,
-                aiSuggestedMoods: _aiSuggestedMoods,
-                loadingAiSuggestions: _loadingAiMoodSuggestions,
-                selectedEmoji: _moodEmoji,
-                selectedLabel: _moodLabel,
-                onSelected: (m) => setState(() {
-                  _moodEmoji = m.emoji;
-                  _moodLabel = m.label;
-                }),
-                onAddCustom: (m) => context.read<AppState>().addCustomMood(m),
-              ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+              BookPageShell(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      '오늘의 장면',
-                      style: Theme.of(context).textTheme.titleSmall,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                dateFmt.format(day),
+                                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                      color: AppTheme.inkMuted,
+                                      letterSpacing: 0.2,
+                                    ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                pageLabel,
+                                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: -0.2,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_moodEmoji != null)
+                          MoodStampBadge(
+                            emoji: _moodEmoji!,
+                            label: _moodLabel ?? '',
+                          ),
+                      ],
                     ),
+                    const SizedBox(height: 16),
+                    MoodSelector(
+                      moods: context.watch<AppState>().personalizedMoods,
+                      recentMoods: context.watch<AppState>().recentMoods,
+                      aiSuggestedMoods: _aiSuggestedMoods,
+                      loadingAiSuggestions: _loadingAiMoodSuggestions,
+                      selectedEmoji: _moodEmoji,
+                      selectedLabel: _moodLabel,
+                      bookPage: true,
+                      onSelected: (m) => setState(() {
+                        _moodEmoji = m.emoji;
+                        _moodLabel = m.label;
+                      }),
+                      onAddCustom: (m) => context.read<AppState>().addCustomMood(m),
+                    ),
+                    const SizedBox(height: 14),
                     Text(
-                      '최대 ${DiaryLimits.maxPhotosPerEntry}장 · 탭하면 삭제·순서 변경',
+                      '📷 사진 붙이기',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: AppTheme.inkMuted,
+                            color: AppTheme.accent,
+                            fontWeight: FontWeight.w600,
                           ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     TodayPhotoSection(
                       displayUris: displayUris,
                       newPhotoFiles: _newPhotoFiles,
                       maxPhotos: DiaryLimits.maxPhotosPerEntry,
                       isPickingPhotos: _pickingPhotos,
+                      bookStyle: true,
                       onPickMultiple: _pickMultiple,
                       onPickCamera: _pickCamera,
                       onRemoveDisplay: (uri) => _removeDisplayUri(uri, entry),
@@ -791,30 +817,43 @@ class _RecordScreenState extends State<RecordScreen> {
                         entry: entry,
                       ),
                     ).animate(target: _savedAnim ? 1 : 0).shimmer(duration: 600.ms),
+                    const SizedBox(height: 18),
+                    Text(
+                      '✍️ 오늘의 글',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: AppTheme.accent,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    PaperJournalField(
+                      controller: _noteController,
+                      focusNode: _journalPreviewFocusNode,
+                      embedded: true,
+                      readOnly: true,
+                      minLines: 5,
+                      maxLength: 500,
+                      hintText: '마음에 남는 것을 적어 보세요…',
+                      onTap: _openJournalSheet,
+                    ),
+                    if (isToday) ...[
+                      const SizedBox(height: 10),
+                      TodayWeatherLine(
+                        weather: appState.todayWeather,
+                        loading: appState.loadingTodayWeather,
+                      ),
+                    ] else if (entry?.weatherDisplayLine != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        entry!.weatherDisplayLine!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.inkMuted,
+                            ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-              PaperJournalField(
-                controller: _noteController,
-                focusNode: _noteFocusNode,
-                minLines: 12,
-                maxLength: 500,
-              ),
-              const SizedBox(height: 12),
-              if (isToday)
-                TodayWeatherLine(
-                  weather: appState.todayWeather,
-                  loading: appState.loadingTodayWeather,
-                )
-              else if (entry?.weatherDisplayLine != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(
-                    entry!.weatherDisplayLine!,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
-                  ),
-                ),
             ],
           ),
         ),

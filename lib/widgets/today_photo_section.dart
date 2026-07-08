@@ -14,6 +14,7 @@ class TodayPhotoSection extends StatelessWidget {
     required this.newPhotoFiles,
     this.maxPhotos = 3,
     this.isPickingPhotos = false,
+    this.bookStyle = false,
     required this.onPickMultiple,
     required this.onPickCamera,
     required this.onRemoveDisplay,
@@ -25,6 +26,7 @@ class TodayPhotoSection extends StatelessWidget {
   final List<File> newPhotoFiles;
   final int maxPhotos;
   final bool isPickingPhotos;
+  final bool bookStyle;
   final VoidCallback onPickMultiple;
   final VoidCallback onPickCamera;
   final ValueChanged<String> onRemoveDisplay;
@@ -45,6 +47,7 @@ class TodayPhotoSection extends StatelessWidget {
       return _EmptyTodayCut(
         isPickingPhotos: isPickingPhotos,
         canAddMore: _canAddMore,
+        bookStyle: bookStyle,
         onAdd: () => showRecordPhotoSourceSheet(
           context,
           onGallery: onPickMultiple,
@@ -58,6 +61,7 @@ class TodayPhotoSection extends StatelessWidget {
       maxPhotos: maxPhotos,
       canAddMore: _canAddMore,
       isPickingPhotos: isPickingPhotos,
+      bookStyle: bookStyle,
       onTapOpen: () => _openGallerySheet(context, entries),
       onAdd: () => showRecordPhotoSourceSheet(
         context,
@@ -116,11 +120,13 @@ class _EmptyTodayCut extends StatelessWidget {
     required this.onAdd,
     this.isPickingPhotos = false,
     this.canAddMore = true,
+    this.bookStyle = false,
   });
 
   final VoidCallback onAdd;
   final bool isPickingPhotos;
   final bool canAddMore;
+  final bool bookStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -129,6 +135,7 @@ class _EmptyTodayCut extends StatelessWidget {
       onAdd: canAddMore ? onAdd : null,
       canAddMore: canAddMore,
       isPickingPhotos: isPickingPhotos,
+      bookStyle: bookStyle,
       child: const Stack(
         alignment: Alignment.center,
         clipBehavior: Clip.none,
@@ -147,6 +154,7 @@ class _PhotoStackPreview extends StatelessWidget {
     required this.maxPhotos,
     this.canAddMore = true,
     this.isPickingPhotos = false,
+    this.bookStyle = false,
   });
 
   final List<_TodayPhotoEntry> entries;
@@ -155,6 +163,7 @@ class _PhotoStackPreview extends StatelessWidget {
   final int maxPhotos;
   final bool canAddMore;
   final bool isPickingPhotos;
+  final bool bookStyle;
 
   static const _offsets = [
     Offset(-14, 6),
@@ -173,6 +182,7 @@ class _PhotoStackPreview extends StatelessWidget {
       onAdd: canAddMore ? onAdd : null,
       canAddMore: canAddMore,
       isPickingPhotos: isPickingPhotos,
+      bookStyle: bookStyle,
       badge: count > 1
           ? Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -212,6 +222,7 @@ class _TodayPhotoStackFrame extends StatelessWidget {
     this.badge,
     this.canAddMore = true,
     this.isPickingPhotos = false,
+    this.bookStyle = false,
   });
 
   final VoidCallback? onTap;
@@ -220,11 +231,16 @@ class _TodayPhotoStackFrame extends StatelessWidget {
   final Widget? badge;
   final bool canAddMore;
   final bool isPickingPhotos;
+  final bool bookStyle;
 
   @override
   Widget build(BuildContext context) {
+    final height = bookStyle ? 168.0 : 140.0;
+    final stackWidth = bookStyle ? 240.0 : 200.0;
+    final stackHeight = bookStyle ? 148.0 : 118.0;
+
     return SizedBox(
-      height: 140,
+      height: height,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -233,21 +249,29 @@ class _TodayPhotoStackFrame extends StatelessWidget {
               color: Colors.transparent,
               child: InkWell(
                 onTap: onTap,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppTheme.ink.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.paperDark),
-                  ),
-                  child: Center(
-                    child: SizedBox(
-                      width: 200,
-                      height: 118,
-                      child: child,
-                    ),
-                  ),
-                ),
+                borderRadius: BorderRadius.circular(bookStyle ? 8 : 16),
+                child: bookStyle
+                    ? Center(
+                        child: SizedBox(
+                          width: stackWidth,
+                          height: stackHeight,
+                          child: child,
+                        ),
+                      )
+                    : Container(
+                        decoration: BoxDecoration(
+                          color: AppTheme.ink.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppTheme.paperDark),
+                        ),
+                        child: Center(
+                          child: SizedBox(
+                            width: stackWidth,
+                            height: stackHeight,
+                            child: child,
+                          ),
+                        ),
+                      ),
               ),
             ),
           ),
@@ -269,7 +293,7 @@ class _TodayPhotoStackFrame extends StatelessWidget {
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.65),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(bookStyle ? 8 : 16),
                   ),
                   child: const Center(
                     child: SizedBox(

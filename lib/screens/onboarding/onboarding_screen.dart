@@ -144,7 +144,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            '사진과 일기로\n오늘을 남겨요',
+            '하루가 한 페이지가 돼요',
             textAlign: TextAlign.center,
             style: textTheme.headlineSmall?.copyWith(
               height: 1.45,
@@ -154,7 +154,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            '사진, 무드, 글 — 부담 없이\n하루 한 페이지만 쌓으면 돼요.',
+            '사진을 붙이고, 무드를 찍고 —\n펜만 대면 오늘이 책에 남아요.',
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(color: AppTheme.inkMuted, height: 1.55),
           ),
