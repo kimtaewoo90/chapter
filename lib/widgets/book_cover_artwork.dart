@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../core/constants/book_cover_type.dart';
 import '../core/theme/app_theme.dart';
 import 'chapter_photo_image.dart';
+import 'chapter_app_icon.dart';
 import 'chapter_wordmark.dart';
 import 'entry_photo.dart';
 
@@ -17,6 +18,7 @@ class BookCoverArtwork extends StatelessWidget {
     required this.dateRangeLabel,
     this.photoUri,
     this.coverTitle,
+    this.coverYear,
     this.compact = false,
     this.showDate = true,
     this.fillPage = false,
@@ -26,6 +28,8 @@ class BookCoverArtwork extends StatelessWidget {
   final String dateRangeLabel;
   final String? photoUri;
   final String? coverTitle;
+  /// 표지 하단 연도 (챕터 아이콘 표지). null이면 올해.
+  final int? coverYear;
   final bool compact;
   final bool showDate;
   /// PDF 미리보기 등 — 페이지 전체를 크림색으로 채움
@@ -44,6 +48,8 @@ class BookCoverArtwork extends StatelessWidget {
 
     final titleText = coverTitle?.trim();
     final hasTitle = titleText != null && titleText.isNotEmpty;
+    final isChapterIcon = coverType == BookCoverType.chapterIcon;
+    final isPhoto = coverType == BookCoverType.customPhoto && photoUri != null;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(fillPage ? 0 : (compact ? 8 : 12)),
@@ -65,14 +71,26 @@ class BookCoverArtwork extends StatelessWidget {
           padding: EdgeInsets.all(padding),
           child: LayoutBuilder(
             builder: (context, constraints) {
+              if (isChapterIcon) {
+                return _chapterIconCoverLayout(
+                  constraints: constraints,
+                  titleText: hasTitle ? titleText! : '나의책',
+                  year: coverYear ?? DateTime.now().year,
+                  compact: compact,
+                  titleSize: titleSize,
+                  dateSize: dateSize,
+                  titleGap: titleGap,
+                  dateGap: dateGap,
+                  bottomPad: bottomPad,
+                );
+              }
+
               final showDateLabel =
                   showDate && !compact && dateRangeLabel.isNotEmpty;
               final innerW = constraints.maxWidth;
               final innerH = constraints.maxHeight;
 
               final horizontalScale = compact ? 1.0 : 1.25;
-              final isPhoto =
-                  coverType == BookCoverType.customPhoto && photoUri != null;
 
               final titleBlockHeight =
                   hasTitle ? titleGap + titleSize * 1.35 : 0.0;
@@ -165,6 +183,69 @@ class BookCoverArtwork extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _chapterIconCoverLayout({
+    required BoxConstraints constraints,
+    required String titleText,
+    required int year,
+    required bool compact,
+    required double titleSize,
+    required double dateSize,
+    required double titleGap,
+    required double dateGap,
+    required double bottomPad,
+  }) {
+    final innerW = constraints.maxWidth;
+    final innerH = constraints.maxHeight;
+    final titleBlockHeight = titleGap + titleSize * 1.35;
+    final yearBlockHeight = dateGap + dateSize * 1.35 + bottomPad;
+    final maxIconH = (innerH - titleBlockHeight - yearBlockHeight).clamp(0.0, double.infinity);
+    final iconSize = math.min(innerW * (compact ? 0.42 : 0.38), maxIconH * (compact ? 0.92 : 0.88))
+        .clamp(compact ? 28.0 : 72.0, compact ? 72.0 : 128.0);
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Center(
+            child: ChapterAppIcon(
+              size: iconSize,
+              shadow: !compact,
+            ),
+          ),
+        ),
+        SizedBox(height: titleGap),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Text(
+            titleText,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: titleSize,
+              fontWeight: FontWeight.w600,
+              height: 1.25,
+              color: AppTheme.ink,
+            ),
+          ),
+        ),
+        SizedBox(height: dateGap),
+        Text(
+          '$year',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: compact ? dateSize + 2 : dateSize + 10,
+            fontWeight: FontWeight.w300,
+            letterSpacing: 1.2,
+            height: 1.1,
+            color: AppTheme.inkMuted,
+          ),
+        ),
+        SizedBox(height: bottomPad),
+      ],
     );
   }
 

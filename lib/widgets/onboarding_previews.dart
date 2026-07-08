@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../core/constants/app_fonts.dart';
+import '../core/constants/book_cover_type.dart';
 import '../core/theme/app_theme.dart';
+import 'book_cover_artwork.dart';
 
 /// 온보딩 — 책 한 페이지에 사진·무드·글을 붙이는 쇼케이스
 class OnboardingRecordPreview extends StatefulWidget {
@@ -479,11 +481,25 @@ class OnboardingChaptersPreview extends StatelessWidget {
 /// 하위 호환 — 스토어 스크린샷 등
 typedef OnboardingDiaryListPreview = OnboardingChaptersPreview;
 
-/// 온보딩 — 실물 책 주문 미리보기(정적)
-class OnboardingPhysicalBookPreview extends StatelessWidget {
-  const OnboardingPhysicalBookPreview({super.key, this.framed = true});
+/// 온보딩 — 실물 책 주문 쇼케이스 (애니메이션)
+class OnboardingPhysicalBookPreview extends StatefulWidget {
+  const OnboardingPhysicalBookPreview({
+    super.key,
+    this.framed = true,
+    this.active = true,
+  });
 
   final bool framed;
+  /// 온보딩에서 이 페이지가 보일 때 애니메이션 재생
+  final bool active;
+
+  @override
+  State<OnboardingPhysicalBookPreview> createState() => _OnboardingPhysicalBookPreviewState();
+}
+
+class _OnboardingPhysicalBookPreviewState extends State<OnboardingPhysicalBookPreview>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
 
   static const _steps = [
     (Icons.edit_note_outlined, '기록 모음'),
@@ -492,80 +508,243 @@ class OnboardingPhysicalBookPreview extends StatelessWidget {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 4200),
+    );
+    if (widget.active) _c.forward();
+  }
+
+  @override
+  void didUpdateWidget(OnboardingPhysicalBookPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active) {
+      _c.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  double _interval(double start, double end) {
+    final t = _c.value;
+    if (t <= start) return 0;
+    if (t >= end) return 1;
+    return ((t - start) / (end - start)).clamp(0.0, 1.0);
+  }
+
+  double _clampOpacity(double value) => value.clamp(0.0, 1.0);
+
+  @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final year = DateTime.now().year;
-    final coverHeight = framed ? 200.0 : 260.0;
+    final coverHeight = widget.framed ? 200.0 : 240.0;
 
-    final body = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(height: framed ? 20 : 8),
-        _BookCoverMock(year: year, height: coverHeight),
-        SizedBox(height: framed ? 20 : 28),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
-            children: [
-              for (var i = 0; i < _steps.length; i++) ...[
-                if (i > 0)
-                  Expanded(
-                    child: Container(
-                      height: 1,
-                      margin: const EdgeInsets.only(bottom: 28),
-                      color: AppTheme.paperDark,
+    final body = AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final stackIn = Curves.easeOutCubic.transform(_interval(0, 0.22));
+        final bookInRaw = Curves.easeOutBack.transform(_interval(0.16, 0.46));
+        final bookIn = _clampOpacity(bookInRaw);
+        final bookGlow = Curves.easeInOut.transform(_interval(0.44, 0.58));
+        final step1 = _clampOpacity(Curves.easeOutBack.transform(_interval(0.38, 0.54)));
+        final step2 = _clampOpacity(Curves.easeOutBack.transform(_interval(0.48, 0.64)));
+        final step3 = _clampOpacity(Curves.easeOutBack.transform(_interval(0.58, 0.74)));
+        final line1 = Curves.easeOut.transform(_interval(0.46, 0.58));
+        final line2 = Curves.easeOut.transform(_interval(0.56, 0.68));
+        final captionIn = _clampOpacity(Curves.easeOut.transform(_interval(0.68, 0.84)));
+        final cardIn = _clampOpacity(Curves.easeOutCubic.transform(_interval(0.74, 0.92)));
+        final chipsIn = _clampOpacity(Curves.easeOut.transform(_interval(0.82, 0.98)));
+        final stepValues = [step1, step2, step3];
+        final lineValues = [line1, line2];
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: widget.framed ? 20 : 4),
+            SizedBox(
+              height: coverHeight + 36,
+              child: Stack(
+                alignment: Alignment.bottomCenter,
+                clipBehavior: Clip.none,
+                children: [
+                  for (var i = 0; i < 3; i++)
+                    Positioned(
+                      bottom: 12 + i * 5.0,
+                      child: Opacity(
+                        opacity: _clampOpacity(stackIn * (1 - bookIn * 0.85)),
+                        child: Transform.translate(
+                          offset: Offset((i - 1) * 14 * (1 - stackIn), (1 - stackIn) * 24),
+                          child: Transform.rotate(
+                            angle: (i - 1) * 0.06,
+                            child: _ThinPageLayer(width: coverHeight * 0.72),
+                          ),
+                        ),
+                      ),
+                    ),
+                  Transform.translate(
+                    offset: Offset(0, (1 - bookInRaw.clamp(0.0, 1.0)) * 40),
+                    child: Transform.scale(
+                      scale: 0.78 + bookInRaw.clamp(0.0, 1.0) * 0.22,
+                      child: Opacity(
+                        opacity: bookIn,
+                        child: _OnboardingCoverPreview(
+                          year: year,
+                          height: coverHeight,
+                          glow: bookGlow,
+                        ),
+                      ),
                     ),
                   ),
-                Expanded(
-                  child: _DeliveryStep(
-                    icon: _steps[i].$1,
-                    label: _steps[i].$2,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        Padding(
-          padding: EdgeInsets.fromLTRB(24, 0, 24, framed ? 20 : 12),
-          child: Text(
-            '한 달치 기록이 쌓이면 주문할 수 있어요.\n날짜순으로 정리된 나만의 책이 도착합니다.',
-            textAlign: TextAlign.center,
-            style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted, height: 1.5),
-          ),
-        ),
-        if (!framed) ...[
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.7),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppTheme.paperDark),
-              ),
-              child: Column(
-                children: [
-                  Text('CHAPTER', style: textTheme.labelSmall?.copyWith(letterSpacing: 4, color: AppTheme.inkMuted)),
-                  const SizedBox(height: 6),
-                  Text('실물 책 주문', style: textTheme.titleSmall),
-                  const SizedBox(height: 4),
-                  Text(
-                    '미리보기 확인 → 입금 → 제작·배송',
-                    style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
-                  ),
+                  if (bookIn > 0.5)
+                    Positioned(
+                      top: 0,
+                      child: Opacity(
+                        opacity: _clampOpacity((bookIn - 0.5) * 2 * bookGlow),
+                        child: const _DeliverySparkle(),
+                      ),
+                    ),
                 ],
               ),
             ),
-          ),
-        ],
-      ],
+            SizedBox(height: widget.framed ? 20 : 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  for (var i = 0; i < _steps.length; i++) ...[
+                    if (i > 0)
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.center,
+                          child: Container(
+                            height: 1,
+                            margin: const EdgeInsets.only(bottom: 28),
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                return Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: SizedBox(
+                                    width: constraints.maxWidth * lineValues[i - 1],
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.accent.withValues(alpha: 0.35),
+                                        borderRadius: BorderRadius.circular(1),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    Expanded(
+                      child: Opacity(
+                        opacity: stepValues[i],
+                        child: Transform.scale(
+                          scale: 0.7 + stepValues[i] * 0.3,
+                          child: _DeliveryStep(
+                            icon: _steps[i].$1,
+                            label: _steps[i].$2,
+                            highlighted: i == 2 && step3 > 0.85,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Opacity(
+              opacity: captionIn,
+              child: Transform.translate(
+                offset: Offset(0, (1 - captionIn) * 12),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(24, 0, 24, widget.framed ? 20 : 8),
+                  child: Text(
+                    '한 달치 기록이 쌓이면 주문할 수 있어요.\n날짜순으로 정리된 나만의 책이 도착합니다.',
+                    textAlign: TextAlign.center,
+                    style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted, height: 1.5),
+                  ),
+                ),
+              ),
+            ),
+            if (!widget.framed) ...[
+              Opacity(
+                opacity: cardIn,
+                child: Transform.translate(
+                  offset: Offset(0, (1 - cardIn) * 16),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppTheme.paperDark),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.accent.withValues(alpha: 0.08 * cardIn),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'CHAPTER',
+                            style: textTheme.labelSmall?.copyWith(
+                              letterSpacing: 4,
+                              color: AppTheme.inkMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text('실물 책 주문', style: textTheme.titleSmall),
+                          const SizedBox(height: 4),
+                          Text(
+                            '미리보기 확인 → 입금 → 제작·배송',
+                            style: textTheme.bodySmall?.copyWith(color: AppTheme.inkMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Opacity(
+                opacity: chipsIn,
+                child: Transform.translate(
+                  offset: Offset(0, (1 - chipsIn) * 8),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _FlowChip(emoji: '📅', label: '기록 쌓기'),
+                      SizedBox(width: 8),
+                      _FlowChip(emoji: '📖', label: '미리보기'),
+                      SizedBox(width: 8),
+                      _FlowChip(emoji: '📦', label: '집까지 배송'),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
 
-    if (!framed) return body;
+    if (!widget.framed) return body;
 
     return Container(
       decoration: BoxDecoration(
@@ -581,87 +760,104 @@ class OnboardingPhysicalBookPreview extends StatelessWidget {
   }
 }
 
-class _BookCoverMock extends StatelessWidget {
-  const _BookCoverMock({required this.year, this.height = 200});
+class _ThinPageLayer extends StatelessWidget {
+  const _ThinPageLayer({required this.width});
 
-  final int year;
-  final double height;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: height,
-      margin: EdgeInsets.symmetric(horizontal: height >= 240 ? 32 : 48),
+      width: width,
+      height: width * 0.62,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF5C5048), Color(0xFF8B7355), Color(0xFF4A3F36)],
-        ),
-        boxShadow: const [
-          BoxShadow(color: AppTheme.warmShadow, blurRadius: 24, offset: Offset(8, 14)),
+        color: const Color(0xFFFAF6EE),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppTheme.paperDark.withValues(alpha: 0.6)),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.ink.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(2, 4),
+          ),
         ],
       ),
-      child: Stack(
-        children: [
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 14,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.black.withValues(alpha: 0.25),
-                    Colors.black.withValues(alpha: 0.05),
-                  ],
-                ),
+      child: CustomPaint(painter: _ShowcasePaperPainter()),
+    );
+  }
+}
+
+class _DeliverySparkle extends StatelessWidget {
+  const _DeliverySparkle();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.auto_awesome, size: 14, color: AppTheme.accent.withValues(alpha: 0.85)),
+        const SizedBox(width: 6),
+        Text(
+          '나만의 한 권이 완성돼요',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppTheme.accent,
+                fontWeight: FontWeight.w600,
               ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OnboardingCoverPreview extends StatelessWidget {
+  const _OnboardingCoverPreview({
+    required this.year,
+    required this.height,
+    this.glow = 0,
+  });
+
+  final int year;
+  final double height;
+  final double glow;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          const BoxShadow(color: AppTheme.warmShadow, blurRadius: 24, offset: Offset(8, 14)),
+          if (glow > 0)
+            BoxShadow(
+              color: AppTheme.accent.withValues(alpha: 0.22 * glow),
+              blurRadius: 28,
+              spreadRadius: 2 * glow,
             ),
-          ),
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'CHAPTER',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.75),
-                        letterSpacing: 6,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '$year',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w300,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '나의 책',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.7),
-                      ),
-                ),
-              ],
-            ),
-          ),
         ],
+      ),
+      child: SizedBox(
+        width: height * 0.75,
+        height: height,
+        child: BookCoverArtwork(
+          coverType: BookCoverType.chapterIcon,
+          dateRangeLabel: '',
+          coverYear: year,
+        ),
       ),
     );
   }
 }
 
 class _DeliveryStep extends StatelessWidget {
-  const _DeliveryStep({required this.icon, required this.label});
+  const _DeliveryStep({
+    required this.icon,
+    required this.label,
+    this.highlighted = false,
+  });
 
   final IconData icon;
   final String label;
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
@@ -671,8 +867,11 @@ class _DeliveryStep extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: AppTheme.accent.withValues(alpha: 0.1),
+            color: highlighted
+                ? AppTheme.accent.withValues(alpha: 0.18)
+                : AppTheme.accent.withValues(alpha: 0.1),
             shape: BoxShape.circle,
+            border: highlighted ? Border.all(color: AppTheme.accent.withValues(alpha: 0.45)) : null,
           ),
           child: Icon(icon, size: 22, color: AppTheme.accent),
         ),

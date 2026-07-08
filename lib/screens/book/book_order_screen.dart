@@ -321,6 +321,7 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
               dateRangeLabel: dateRange,
               photoUri: _coverPhotoUri,
               coverTitle: _coverTitle,
+              coverYear: DateTime.now().year,
             ),
           ),
         ),
@@ -335,7 +336,7 @@ class _BookOrderScreenState extends State<BookOrderScreen> {
           onSubmitted: (_) => _dismissKeyboard(),
           decoration: InputDecoration(
             labelText: '표지 제목 (선택)',
-            hintText: '비우면 제목 없이 인쇄돼요',
+            hintText: '나의책',
             counterText: '',
             filled: true,
             fillColor: Colors.white.withValues(alpha: 0.7),

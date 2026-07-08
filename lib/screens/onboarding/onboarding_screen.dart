@@ -187,7 +187,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             style: textTheme.bodyMedium?.copyWith(color: AppTheme.inkMuted, height: 1.55),
           ),
           const SizedBox(height: 24),
-          const OnboardingPhysicalBookPreview(framed: false),
+          OnboardingPhysicalBookPreview(framed: false, active: _page == 2),
         ],
       ),
     );

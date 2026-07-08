@@ -289,6 +289,7 @@ class _BookPdfCoverPage extends StatelessWidget {
       dateRangeLabel: dateRangeLabel,
       photoUri: photoUri,
       coverTitle: coverTitle,
+      coverYear: DateTime.now().year,
       fillPage: true,
     );
   }
