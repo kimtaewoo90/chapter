@@ -9,6 +9,7 @@ import '../core/utils/entry_photos.dart';
 import '../models/daily_entry.dart';
 import '../providers/app_state.dart';
 import 'entry_photo.dart';
+import 'entry_photo_viewer.dart';
 
 /// 피드 — 하루가 한 장의 책 페이지
 class JournalBookPage extends StatelessWidget {
@@ -109,19 +110,27 @@ class _ScrollableBookPage extends StatelessWidget {
                         if (uris.isNotEmpty) ...[
                           const SizedBox(height: 14),
                           if (uris.length == 1)
-                            EntryPhoto(
-                              url: uris.first,
-                              borderRadius: 4,
-                              naturalWidth: true,
+                            _TappableEntryPhoto(
+                              uris: uris,
+                              index: 0,
+                              child: EntryPhoto(
+                                url: uris.first,
+                                borderRadius: 4,
+                                naturalWidth: true,
+                              ),
                             )
                           else
-                            ...uris.map(
-                              (uri) => Padding(
+                            ...uris.asMap().entries.map(
+                              (e) => Padding(
                                 padding: const EdgeInsets.only(bottom: 8),
-                                child: EntryPhoto(
-                                  url: uri,
-                                  borderRadius: 4,
-                                  naturalWidth: true,
+                                child: _TappableEntryPhoto(
+                                  uris: uris,
+                                  index: e.key,
+                                  child: EntryPhoto(
+                                    url: e.value,
+                                    borderRadius: 4,
+                                    naturalWidth: true,
+                                  ),
                                 ),
                               ),
                             ),
@@ -238,11 +247,26 @@ class _FixedBookPage extends StatelessWidget {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(4),
                           child: uris.length == 1
-                              ? EntryPhoto(url: uris.first, height: double.infinity, borderRadius: 4)
+                              ? _TappableEntryPhoto(
+                                  uris: uris,
+                                  index: 0,
+                                  child: EntryPhoto(
+                                    url: uris.first,
+                                    height: double.infinity,
+                                    borderRadius: 4,
+                                  ),
+                                )
                               : PageView.builder(
                                   itemCount: uris.length,
-                                  itemBuilder: (_, i) =>
-                                      EntryPhoto(url: uris[i], height: double.infinity, borderRadius: 4),
+                                  itemBuilder: (_, i) => _TappableEntryPhoto(
+                                    uris: uris,
+                                    index: i,
+                                    child: EntryPhoto(
+                                      url: uris[i],
+                                      height: double.infinity,
+                                      borderRadius: 4,
+                                    ),
+                                  ),
                                 ),
                         ),
                       )
@@ -288,6 +312,30 @@ class _FixedBookPage extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TappableEntryPhoto extends StatelessWidget {
+  const _TappableEntryPhoto({
+    required this.uris,
+    required this.index,
+    required this.child,
+  });
+
+  final List<String> uris;
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => showEntryPhotoViewer(
+        context,
+        uris: uris,
+        initialIndex: index,
+      ),
+      child: child,
     );
   }
 }

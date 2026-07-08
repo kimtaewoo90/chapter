@@ -10,6 +10,7 @@ import '../../core/utils/entry_photos.dart';
 import '../../models/daily_entry.dart';
 import '../../providers/app_state.dart';
 import '../../widgets/entry_photo_grid.dart';
+import '../../widgets/entry_photo_viewer.dart';
 import '../../widgets/paper_background.dart';
 
 Future<void> showEntryDaySheet(
@@ -86,7 +87,15 @@ class _EntryDaySheetBody extends StatelessWidget {
               ],
               if (uris.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                EntryPhotoGrid(localPaths: uris, height: 200),
+                EntryPhotoGrid(
+                  localPaths: uris,
+                  height: 200,
+                  onPhotoTap: (index) => showEntryPhotoViewer(
+                    context,
+                    uris: uris,
+                    initialIndex: index,
+                  ),
+                ),
               ],
               if (EntryDiaryAi.primaryDiaryText(entry) != null) ...[
                 const SizedBox(height: 20),

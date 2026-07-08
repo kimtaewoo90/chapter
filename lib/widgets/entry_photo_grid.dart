@@ -14,6 +14,7 @@ class EntryPhotoGrid extends StatelessWidget {
     this.height = 120,
     this.onRemoveLocal,
     this.onRemoveNew,
+    this.onPhotoTap,
   });
 
   final List<String> localPaths;
@@ -21,6 +22,7 @@ class EntryPhotoGrid extends StatelessWidget {
   final double height;
   final ValueChanged<int>? onRemoveLocal;
   final ValueChanged<int>? onRemoveNew;
+  final ValueChanged<int>? onPhotoTap;
 
   @override
   Widget build(BuildContext context) {
@@ -37,18 +39,25 @@ class EntryPhotoGrid extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
           final isLocal = index < localPaths.length;
+          final photo = ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: height * 0.85,
+              height: height,
+              child: isLocal
+                  ? EntryPhoto(url: localPaths[index], height: height, borderRadius: 12)
+                  : EntryPhoto(file: newFiles[index - localPaths.length], height: height, borderRadius: 12),
+            ),
+          );
           return Stack(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: height * 0.85,
-                  height: height,
-                  child: isLocal
-                      ? EntryPhoto(url: localPaths[index], height: height, borderRadius: 12)
-                      : EntryPhoto(file: newFiles[index - localPaths.length], height: height, borderRadius: 12),
-                ),
-              ),
+              if (onPhotoTap != null)
+                GestureDetector(
+                  onTap: () => onPhotoTap!(index),
+                  child: photo,
+                )
+              else
+                photo,
               if (onRemoveLocal != null || onRemoveNew != null)
                 Positioned(
                   top: 4,
