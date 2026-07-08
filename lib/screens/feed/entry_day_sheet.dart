@@ -119,7 +119,7 @@ class _EntryDaySheetBody extends StatelessWidget {
           ),
           Positioned(
             left: 20,
-            right: onEdit != null ? 80 : 20,
+            right: 20,
             bottom: 32,
             child: Row(
               children: [
