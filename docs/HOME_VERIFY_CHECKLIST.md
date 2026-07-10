@@ -27,6 +27,24 @@ cd chapter && flutter pub get && flutter run
 
 ---
 
+### Layer 5 — `2026-07-10` Phase B·C WYSIWYG + 되돌리기 플래그
+
+- [ ] 기록 화면 **한 장** — PDF 레이아웃 위에서 무드·사진·글 직접 편집 (`kRecordBookPageComposer=true`)
+- [ ] 무드: 헤더 「+ 무드」또는 칩 → 시트
+- [ ] 사진: 페이지/칩 탭 → 추가·삭제·순서 → 배치 즉시 반영
+- [ ] 글: 책 줄노트 박스에 직접 타이핑
+- [ ] 저장 「한 장 더 쌓였어요 · 한 해 N%」+ 책등 연출 (`kRecordSaveAnimationV2`)
+- [ ] 온보딩 2페이지 — PDF와 같은 페이지 비율
+- [ ] **되돌리기:** `RECORD_BOOK_PAGE_COMPOSER=false` → Phase A 분리 UI 복원
+
+---
+
+### Layer 4 — `2026-07-10` Phase A · 기록 화면 책 페이지 미리보기
+
+- [ ] *(Layer 5가 켜져 있으면 Layer 4는 `RECORD_BOOK_PAGE_COMPOSER=false` 로 따로 확인)*
+
+---
+
 ### Layer 3 — `2026-07-07` 챕터 제거 · 온보딩 · 사진 수정 버그
 
 - [ ] 온보딩 3단계: 소개 → 사진·일기 → 실물 책 → 시작하기

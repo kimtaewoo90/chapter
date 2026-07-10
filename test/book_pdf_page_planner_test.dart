@@ -1,7 +1,10 @@
+import 'package:chapter/core/book_layout/book_layout_engine.dart';
 import 'package:chapter/core/book_layout/book_layout_types.dart';
+import 'package:chapter/core/book_layout/book_pdf_diary_block.dart';
 import 'package:chapter/core/book_layout/book_pdf_layout_metrics.dart';
 import 'package:chapter/core/book_layout/book_pdf_page_planner.dart';
 import 'package:chapter/core/book_layout/book_pdf_style.dart';
+import 'package:chapter/core/book_layout/book_preview_entry_mapper.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -83,5 +86,34 @@ void main() {
         lessThanOrEqualTo(BookPdfStyle.pageContentHeight + 1),
       );
     }
+  });
+
+  test('planSingleEntry — 단일 일기 헤더·본문 페이지', () {
+    final pages = BookPdfPreviewPlanner.planSingleEntry(
+      entry: const BookDiaryEntry(
+        date: '2026-07-10',
+        title: '',
+        body: 'Phase A 테스트',
+        moodEmoji: '☀️',
+        moodLabel: '맑음',
+      ),
+    );
+
+    expect(pages, isNotEmpty);
+    expect(pages.first.kind, BookPdfPreviewPageKind.diary);
+    expect(pages.first.diaryBlocks, isNotEmpty);
+  });
+
+  test('planSingleEntry — 사진 3장 그리드 레이아웃', () {
+    final entry = BookPreviewEntryMapper.fromDraft(
+      date: DateTime(2026, 7, 10),
+      note: '짧은 글',
+      photoUris: const ['a.jpg', 'b.jpg', 'c.jpg'],
+    );
+    final plan = BookLayoutEngine.decideLayout(entry);
+    expect(plan.type, BookLayoutType.photoGrid);
+
+    final pages = BookPdfPreviewPlanner.planSingleEntry(entry: entry);
+    expect(pages.first.diaryBlocks!.any((b) => b is BookDiaryPhotosBlock), isTrue);
   });
 }

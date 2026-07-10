@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/constants/dev_flags.dart';
 import '../../core/constants/diary_limits.dart';
 import '../../core/constants/moods.dart';
 import '../../core/theme/app_theme.dart';
@@ -19,15 +19,12 @@ import '../../models/record_save_step.dart';
 import '../../providers/app_state.dart';
 import '../../services/analytics_service.dart';
 import '../../services/photo_permission_service.dart';
+import '../../widgets/book_diary_page_composer.dart';
 import '../../widgets/record_save_overlay.dart';
-import '../../widgets/book_page_shell.dart';
+import 'record_screen_phase_a_body.dart';
 import '../../widgets/dismiss_keyboard.dart';
 import '../../widgets/journal_write_sheet.dart';
-import '../../widgets/mood_selector.dart';
 import '../../widgets/paper_background.dart';
-import '../../widgets/paper_journal_field.dart';
-import '../../widgets/today_photo_section.dart';
-import '../../widgets/today_weather_line.dart';
 
 class RecordScreen extends StatefulWidget {
   const RecordScreen({
@@ -628,9 +625,14 @@ class _RecordScreenState extends State<RecordScreen> {
       widget.onSavedSuccessfully?.call();
       if (mounted) {
         final cloudMsg = appState.lastCloudSyncError;
+        final progress = (appState.bookProgress * 100).round();
         final savedLabel = appState.isToday(day)
-            ? '오늘이 책에 남았습니다.'
-            : '${DateFormat('M월 d일', 'ko_KR').format(day)} 기록을 저장했어요.';
+            ? (kRecordSaveAnimationV2
+                ? '한 장 더 쌓였어요 · 한 해 $progress%'
+                : '오늘이 책에 남았습니다.')
+            : kRecordBookPageComposer
+                ? '${DateFormat('M월 d일', 'ko_KR').format(day)} 페이지를 고쳤어요.'
+                : '${DateFormat('M월 d일', 'ko_KR').format(day)} 기록을 저장했어요.';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -710,10 +712,6 @@ class _RecordScreenState extends State<RecordScreen> {
     }
 
     final displayUris = _displayPhotoUris(entry);
-    final dateFmt = DateFormat('yyyy년 M월 d일 · EEEE', 'ko_KR');
-    final pageLabel = isToday
-        ? '오늘의 한 페이지'
-        : DateFormat('M월 d일 기록', 'ko_KR').format(day);
 
     return PaperBackground(
       child: Stack(
@@ -733,76 +731,32 @@ class _RecordScreenState extends State<RecordScreen> {
           ],
         ),
         body: DismissKeyboard(
-          child: ListView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
-            children: [
-              BookPageShell(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: kRecordBookPageComposer
+              ? ListView(
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                dateFmt.format(day),
-                                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                      color: AppTheme.inkMuted,
-                                      letterSpacing: 0.2,
-                                    ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                pageLabel,
-                                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: -0.2,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (_moodEmoji != null)
-                          MoodStampBadge(
-                            emoji: _moodEmoji!,
-                            label: _moodLabel ?? '',
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    MoodSelector(
-                      moods: context.watch<AppState>().personalizedMoods,
-                      recentMoods: context.watch<AppState>().recentMoods,
+                    BookDiaryPageComposer(
+                      date: day,
+                      noteController: _noteController,
+                      noteFocusNode: _journalPreviewFocusNode,
+                      displayUris: displayUris,
+                      newPhotoFiles: _newPhotoFiles,
+                      moodEmoji: _moodEmoji,
+                      moodLabel: _moodLabel,
+                      isToday: isToday,
                       aiSuggestedMoods: _aiSuggestedMoods,
                       loadingAiSuggestions: _loadingAiMoodSuggestions,
-                      selectedEmoji: _moodEmoji,
-                      selectedLabel: _moodLabel,
-                      bookPage: true,
-                      onSelected: (m) => setState(() {
+                      isPickingPhotos: _pickingPhotos,
+                      weather: appState.todayWeather,
+                      loadingWeather: appState.loadingTodayWeather,
+                      personalizedMoods: appState.personalizedMoods,
+                      recentMoods: appState.recentMoods,
+                      onMoodSelected: (MoodOption m) => setState(() {
                         _moodEmoji = m.emoji;
                         _moodLabel = m.label;
                       }),
-                      onAddCustom: (m) => context.read<AppState>().addCustomMood(m),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      '📷 사진 붙이기',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: AppTheme.accent,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    TodayPhotoSection(
-                      displayUris: displayUris,
-                      newPhotoFiles: _newPhotoFiles,
-                      maxPhotos: DiaryLimits.maxPhotosPerEntry,
-                      isPickingPhotos: _pickingPhotos,
-                      bookStyle: true,
+                      onAddCustomMood: (m) => context.read<AppState>().addCustomMood(m),
                       onPickMultiple: _pickMultiple,
                       onPickCamera: _pickCamera,
                       onRemoveDisplay: (uri) => _removeDisplayUri(uri, entry),
@@ -811,39 +765,15 @@ class _RecordScreenState extends State<RecordScreen> {
                         _newPhotoFiles.removeAt(i);
                         _scheduleAiMoodSuggestions();
                       }),
-                      onReorderCombined: (reorderedDisplay, reorderedNew) => _reorderCombinedPhotos(
+                      onReorderCombined: (reorderedDisplay, reorderedNew) =>
+                          _reorderCombinedPhotos(
                         reorderedDisplayUris: reorderedDisplay,
                         reorderedNewFiles: reorderedNew,
                         entry: entry,
                       ),
-                    ).animate(target: _savedAnim ? 1 : 0).shimmer(duration: 600.ms),
-                    const SizedBox(height: 18),
-                    Text(
-                      '✍️ 오늘의 글',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: AppTheme.accent,
-                            fontWeight: FontWeight.w600,
-                          ),
                     ),
-                    const SizedBox(height: 6),
-                    PaperJournalField(
-                      controller: _noteController,
-                      focusNode: _journalPreviewFocusNode,
-                      embedded: true,
-                      readOnly: true,
-                      minLines: 5,
-                      maxLength: 500,
-                      hintText: '마음에 남는 것을 적어 보세요…',
-                      onTap: _openJournalSheet,
-                    ),
-                    if (isToday) ...[
-                      const SizedBox(height: 10),
-                      TodayWeatherLine(
-                        weather: appState.todayWeather,
-                        loading: appState.loadingTodayWeather,
-                      ),
-                    ] else if (entry?.weatherDisplayLine != null) ...[
-                      const SizedBox(height: 10),
+                    if (!isToday && entry?.weatherDisplayLine != null) ...[
+                      const SizedBox(height: 8),
                       Text(
                         entry!.weatherDisplayLine!,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -852,10 +782,42 @@ class _RecordScreenState extends State<RecordScreen> {
                       ),
                     ],
                   ],
+                )
+              : RecordScreenPhaseABody(
+                  day: day,
+                  entry: entry,
+                  isToday: isToday,
+                  displayUris: displayUris,
+                  newPhotoFiles: _newPhotoFiles,
+                  noteController: _noteController,
+                  noteFocusNode: _journalPreviewFocusNode,
+                  moodEmoji: _moodEmoji,
+                  moodLabel: _moodLabel,
+                  aiSuggestedMoods: _aiSuggestedMoods,
+                  loadingAiMoodSuggestions: _loadingAiMoodSuggestions,
+                  isPickingPhotos: _pickingPhotos,
+                  savedAnim: _savedAnim,
+                  onMoodSelected: (MoodOption m) => setState(() {
+                    _moodEmoji = m.emoji;
+                    _moodLabel = m.label;
+                  }),
+                  onAddCustomMood: (m) => context.read<AppState>().addCustomMood(m),
+                  onPickMultiple: _pickMultiple,
+                  onPickCamera: _pickCamera,
+                  onRemoveDisplay: (uri) => _removeDisplayUri(uri, entry),
+                  onRemoveNew: (i) => setState(() {
+                    _photosEdited = true;
+                    _newPhotoFiles.removeAt(i);
+                    _scheduleAiMoodSuggestions();
+                  }),
+                  onReorderCombined: (reorderedDisplay, reorderedNew) =>
+                      _reorderCombinedPhotos(
+                    reorderedDisplayUris: reorderedDisplay,
+                    reorderedNewFiles: reorderedNew,
+                    entry: entry,
+                  ),
+                  onOpenJournalSheet: _openJournalSheet,
                 ),
-              ),
-            ],
-          ),
         ),
         bottomNavigationBar: SafeArea(
           child: Padding(
@@ -877,6 +839,7 @@ class _RecordScreenState extends State<RecordScreen> {
               child: RecordSaveOverlay(
                 step: _saveStep,
                 complete: _saveOverlayComplete,
+                bookProgressPercent: (appState.bookProgress * 100).round(),
               ),
             ),
         ],

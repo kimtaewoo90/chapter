@@ -25,6 +25,24 @@ class BookPreviewEntryMapper {
     );
   }
 
+  /// 기록 화면 초안 — 저장 전 실시간 책 페이지 미리보기용
+  static BookDiaryEntry fromDraft({
+    required DateTime date,
+    String? note,
+    List<String> photoUris = const [],
+    String? moodEmoji,
+    String? moodLabel,
+  }) {
+    return BookDiaryEntry(
+      date: DailyEntry.dateKeyFrom(date),
+      title: '',
+      body: note?.trim() ?? '',
+      photoUris: photoUris,
+      moodEmoji: moodEmoji,
+      moodLabel: moodLabel,
+    );
+  }
+
   /// PDF 헤더용 — `☕ 여유` / 이모지만 / 라벨만
   static String? formatMoodDisplay({
     String? moodEmoji,

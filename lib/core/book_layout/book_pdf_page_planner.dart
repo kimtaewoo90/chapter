@@ -81,6 +81,39 @@ class BookPdfPreviewPlanner {
     return pages;
   }
 
+  /// 단일 일기 → PDF 일기 페이지(들) — 기록 화면 미리보기용
+  static List<BookPdfPreviewPage> planSingleEntry({
+    required BookDiaryEntry entry,
+    AppFontId diaryFontId = kDefaultDiaryFontId,
+    bool centerOnPage = true,
+  }) {
+    final plan = BookLayoutEngine.decideLayout(entry);
+    final isFull = plan.pageMode == BookPageMode.full;
+    final compact = !isFull;
+
+    final entryPages = _planSingleEntryPages(
+      entry: entry,
+      plan: plan,
+      isFull: isFull,
+      compact: compact,
+      diaryFontId: diaryFontId,
+    );
+
+    if (entryPages.isEmpty) return entryPages;
+
+    if (centerOnPage && _shouldCenterEntryOnPage(0, plan)) {
+      final firstBlocks = entryPages.first.diaryBlocks!;
+      final totalHeight = BookPdfLayoutMetrics.pageBlocksHeight(
+        firstBlocks,
+        diaryFontId: diaryFontId,
+      );
+      final topInset = _centeredEntryStartY(totalHeight);
+      entryPages[0] = BookPdfPreviewPage.diary(firstBlocks, topInset: topInset);
+    }
+
+    return entryPages;
+  }
+
   static double get _pageHeight =>
       BookPdfStyle.pageContentHeight - BookPdfLayoutMetrics.pageSafetyMargin;
 

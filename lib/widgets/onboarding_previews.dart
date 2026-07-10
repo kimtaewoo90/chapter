@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../core/constants/app_fonts.dart';
 import '../core/constants/book_cover_type.dart';
+import '../core/constants/dev_flags.dart';
+import '../core/book_layout/book_layout_types.dart';
 import '../core/theme/app_theme.dart';
 import 'book_cover_artwork.dart';
 
@@ -52,10 +54,182 @@ class _OnboardingRecordPreviewState extends State<OnboardingRecordPreview>
     return ((t - start) / (end - start)).clamp(0.0, 1.0);
   }
 
+  Widget _buildShowcasePage({
+    required double pageHeight,
+    required TextStyle handwriting,
+    required double photosIn,
+    required double moodIn,
+    required List<double> lineOpacities,
+    required double chipsIn,
+    required TextTheme textTheme,
+    bool usePdfFrame = false,
+  }) {
+    final page = Container(
+      height: usePdfFrame ? null : pageHeight,
+      constraints: usePdfFrame
+          ? const BoxConstraints.expand()
+          : null,
+      decoration: const BoxDecoration(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x302C2824),
+            blurRadius: 28,
+            offset: Offset(6, 14),
+          ),
+          BoxShadow(
+            color: Color(0x142C2824),
+            blurRadius: 8,
+            offset: Offset(1, 3),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: CustomPaint(painter: _ShowcasePaperPainter()),
+            ),
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 16,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppTheme.ink.withValues(alpha: 0.1),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(26, 22, 18, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '3월 8일 · 토요일',
+                              style: textTheme.labelMedium?.copyWith(
+                                color: AppTheme.inkMuted,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '오늘의 한 페이지',
+                              style: textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Transform.scale(
+                        scale: moodIn,
+                        child: Opacity(
+                          opacity: moodIn,
+                          child: Transform.rotate(
+                            angle: 0.08,
+                            child: _MoodStamp(
+                              emoji: '☕',
+                              label: '여유',
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Expanded(
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.center,
+                      children: [
+                        Transform.scale(
+                          scale: 0.88 + photosIn * 0.12,
+                          child: Opacity(
+                            opacity: photosIn.clamp(0.0, 1.0),
+                            child: const _ShowcasePolaroidCluster(),
+                          ),
+                        ),
+                        Positioned(
+                          top: 0,
+                          right: 4,
+                          child: Opacity(
+                            opacity: moodIn,
+                            child: Transform.translate(
+                              offset: Offset((1 - moodIn) * 12, 0),
+                              child: _AiMoodTag(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ...List.generate(_lines.length, (i) {
+                    return Opacity(
+                      opacity: lineOpacities[i],
+                      child: Transform.translate(
+                        offset: Offset(0, (1 - lineOpacities[i]) * 10),
+                        child: Padding(
+                          padding: EdgeInsets.only(top: i == 0 ? 0 : 4),
+                          child: Text(
+                            _lines[i],
+                            style: handwriting,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Opacity(
+                      opacity: chipsIn,
+                      child: Text(
+                        'p. 24',
+                        style: textTheme.labelSmall?.copyWith(
+                          color: AppTheme.inkMuted.withValues(alpha: 0.65),
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!usePdfFrame) return page;
+
+    return AspectRatio(
+      aspectRatio: BookPdfPageSpec.width / BookPdfPageSpec.height,
+      child: page,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final pageHeight = widget.framed ? 360.0 : 400.0;
+    final pageHeight = widget.framed
+        ? (kOnboardingUsesBookPagePreview ? null : 360.0)
+        : (kOnboardingUsesBookPagePreview ? null : 400.0);
     final handwriting = diaryFontStyle(kDefaultDiaryFontId, fontSize: 18, height: 1.55);
 
     final body = AnimatedBuilder(
@@ -80,153 +254,15 @@ class _OnboardingRecordPreviewState extends State<OnboardingRecordPreview>
                 opacity: pageIn,
                 child: Transform.rotate(
                   angle: -0.012,
-                  child: Container(
-                    height: pageHeight,
-                    decoration: const BoxDecoration(
-                      borderRadius: BorderRadius.all(Radius.circular(8)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0x302C2824),
-                          blurRadius: 28,
-                          offset: Offset(6, 14),
-                        ),
-                        BoxShadow(
-                          color: Color(0x142C2824),
-                          blurRadius: 8,
-                          offset: Offset(1, 3),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Stack(
-                        children: [
-                          Positioned.fill(
-                            child: CustomPaint(painter: _ShowcasePaperPainter()),
-                          ),
-                          Positioned(
-                            left: 0,
-                            top: 0,
-                            bottom: 0,
-                            width: 16,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    AppTheme.ink.withValues(alpha: 0.1),
-                                    Colors.transparent,
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(26, 22, 18, 20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '3월 8일 · 토요일',
-                                            style: textTheme.labelMedium?.copyWith(
-                                              color: AppTheme.inkMuted,
-                                              letterSpacing: 0.3,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            '오늘의 한 페이지',
-                                            style: textTheme.titleSmall?.copyWith(
-                                              fontWeight: FontWeight.w600,
-                                              letterSpacing: -0.2,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Transform.scale(
-                                      scale: moodIn,
-                                      child: Opacity(
-                                        opacity: moodIn,
-                                        child: Transform.rotate(
-                                          angle: 0.08,
-                                          child: _MoodStamp(
-                                            emoji: '☕',
-                                            label: '여유',
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 18),
-                                Expanded(
-                                  child: Stack(
-                                    clipBehavior: Clip.none,
-                                    alignment: Alignment.center,
-                                    children: [
-                                      Transform.scale(
-                                        scale: 0.88 + photosIn * 0.12,
-                                        child: Opacity(
-                                          opacity: photosIn.clamp(0.0, 1.0),
-                                          child: const _ShowcasePolaroidCluster(),
-                                        ),
-                                      ),
-                                      Positioned(
-                                        top: 0,
-                                        right: 4,
-                                        child: Opacity(
-                                          opacity: moodIn,
-                                          child: Transform.translate(
-                                            offset: Offset((1 - moodIn) * 12, 0),
-                                            child: _AiMoodTag(),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                ...List.generate(_lines.length, (i) {
-                                  return Opacity(
-                                    opacity: lineOpacities[i],
-                                    child: Transform.translate(
-                                      offset: Offset(0, (1 - lineOpacities[i]) * 10),
-                                      child: Padding(
-                                        padding: EdgeInsets.only(top: i == 0 ? 0 : 4),
-                                        child: Text(
-                                          _lines[i],
-                                          style: handwriting,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }),
-                                const SizedBox(height: 10),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Opacity(
-                                    opacity: chipsIn,
-                                    child: Text(
-                                      'p. 24',
-                                      style: textTheme.labelSmall?.copyWith(
-                                        color: AppTheme.inkMuted.withValues(alpha: 0.65),
-                                        letterSpacing: 1.2,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  child: _buildShowcasePage(
+                    pageHeight: pageHeight ?? 360,
+                    handwriting: handwriting,
+                    photosIn: photosIn,
+                    moodIn: moodIn,
+                    lineOpacities: lineOpacities,
+                    chipsIn: chipsIn,
+                    textTheme: textTheme,
+                    usePdfFrame: kOnboardingUsesBookPagePreview,
                   ),
                 ),
               ),

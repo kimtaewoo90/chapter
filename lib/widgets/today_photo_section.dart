@@ -98,6 +98,49 @@ class TodayPhotoSection extends StatelessWidget {
   }
 }
 
+/// 기록 화면 — 사진 갤러리·삭제·순서 시트 (Composer 등 외부 호출용)
+Future<void> showRecordPhotoGallerySheet(
+  BuildContext context, {
+  required List<String> displayUris,
+  required List<File> newPhotoFiles,
+  required int maxPhotos,
+  required VoidCallback onPickMultiple,
+  required VoidCallback onPickCamera,
+  required ValueChanged<String> onRemoveDisplay,
+  required ValueChanged<int> onRemoveNew,
+  required void Function(List<String> reorderedDisplay, List<File> reorderedNew)
+      onReorderCombined,
+}) {
+  final entries = <_TodayPhotoEntry>[
+    ...displayUris.map((u) => _TodayPhotoEntry.display(u)),
+    ...newPhotoFiles.map((f) => _TodayPhotoEntry.local(f)),
+  ];
+  final canAddMore = entries.length < maxPhotos;
+
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: AppTheme.paper,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (ctx) => _TodayPhotoGallerySheet(
+      entries: entries,
+      maxPhotos: maxPhotos,
+      canAddMore: canAddMore,
+      onAddMore: () => showRecordPhotoSourceSheet(
+        context,
+        onGallery: onPickMultiple,
+        onCamera: onPickCamera,
+      ),
+      onRemoveDisplay: onRemoveDisplay,
+      onRemoveNew: onRemoveNew,
+      onReorderCombined: onReorderCombined,
+    ),
+  );
+}
+
 class _TodayPhotoEntry {
   const _TodayPhotoEntry.display(this.uri)
       : file = null,
