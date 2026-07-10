@@ -1,11 +1,9 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/book_layout/book_layout_types.dart';
-import '../core/book_layout/book_pdf_page_planner.dart';
 import '../core/book_layout/book_preview_entry_mapper.dart';
 import '../core/constants/diary_limits.dart';
 import '../core/constants/moods.dart';
@@ -38,6 +36,7 @@ class BookDiaryPageComposer extends StatefulWidget {
     required this.onRemoveDisplay,
     required this.onRemoveNew,
     required this.onReorderCombined,
+    required this.onOpenJournalSheet,
     this.aiSuggestedMoods = const [],
     this.loadingAiSuggestions = false,
     this.isPickingPhotos = false,
@@ -63,6 +62,7 @@ class BookDiaryPageComposer extends StatefulWidget {
   final ValueChanged<int> onRemoveNew;
   final void Function(List<String> reorderedDisplay, List<File> reorderedNew)
       onReorderCombined;
+  final Future<void> Function() onOpenJournalSheet;
   final List<MoodOption> aiSuggestedMoods;
   final bool loadingAiSuggestions;
   final bool isPickingPhotos;
@@ -76,9 +76,6 @@ class BookDiaryPageComposer extends StatefulWidget {
 }
 
 class _BookDiaryPageComposerState extends State<BookDiaryPageComposer> {
-  double _topInset = 0;
-  Timer? _layoutDebounce;
-
   BookDiaryEntry get _draft => BookPreviewEntryMapper.fromDraft(
         date: widget.date,
         note: widget.noteController.text,
@@ -87,77 +84,17 @@ class _BookDiaryPageComposerState extends State<BookDiaryPageComposer> {
         moodLabel: widget.moodLabel,
       );
 
-  @override
-  void initState() {
-    super.initState();
-    widget.noteController.addListener(_scheduleLayoutRecalc);
-    _recalcTopInset();
-  }
-
-  @override
-  void didUpdateWidget(covariant BookDiaryPageComposer oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.displayUris != widget.displayUris ||
-        oldWidget.moodEmoji != widget.moodEmoji ||
-        oldWidget.moodLabel != widget.moodLabel) {
-      _recalcTopInset();
-    }
-  }
-
-  @override
-  void dispose() {
-    _layoutDebounce?.cancel();
-    widget.noteController.removeListener(_scheduleLayoutRecalc);
-    super.dispose();
-  }
-
-  void _scheduleLayoutRecalc() {
-    _layoutDebounce?.cancel();
-    _layoutDebounce = Timer(const Duration(milliseconds: 200), _recalcTopInset);
-  }
-
-  void _recalcTopInset() {
-    if (!mounted) return;
-    final fontId = context.read<AppState>().diaryFontId;
-    final pages = BookPdfPreviewPlanner.planSingleEntry(
-      entry: _draft,
-      diaryFontId: fontId,
-      centerOnPage: true,
-    );
-    final topInset = pages.isNotEmpty ? pages.first.topInset : 0.0;
-    if (topInset != _topInset) {
-      setState(() => _topInset = topInset);
-    }
-  }
-
   void _openMoodSheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: AppTheme.paper,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
-          child: MoodSelector(
-            moods: widget.personalizedMoods,
-            recentMoods: widget.recentMoods,
-            aiSuggestedMoods: widget.aiSuggestedMoods,
-            loadingAiSuggestions: widget.loadingAiSuggestions,
-            selectedEmoji: widget.moodEmoji,
-            selectedLabel: widget.moodLabel,
-            bookPage: true,
-            onSelected: (m) {
-              widget.onMoodSelected(m);
-              Navigator.pop(ctx);
-            },
-            onAddCustom: widget.onAddCustomMood,
-          ),
-        ),
-      ),
+    showMoodSelectSheet(
+      context,
+      moods: widget.personalizedMoods,
+      recentMoods: widget.recentMoods,
+      aiSuggestedMoods: widget.aiSuggestedMoods,
+      loadingAiSuggestions: widget.loadingAiSuggestions,
+      selectedEmoji: widget.moodEmoji,
+      selectedLabel: widget.moodLabel,
+      onSelected: widget.onMoodSelected,
+      onAddCustom: widget.onAddCustomMood,
     );
   }
 
@@ -203,7 +140,7 @@ class _BookDiaryPageComposerState extends State<BookDiaryPageComposer> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         AspectRatio(
           aspectRatio: BookPdfPageSpec.width / BookPdfPageSpec.height,
           child: BookPdfPageFrame(
@@ -212,9 +149,12 @@ class _BookDiaryPageComposerState extends State<BookDiaryPageComposer> {
               noteController: widget.noteController,
               noteFocusNode: widget.noteFocusNode,
               diaryFontId: fontId,
-              topInset: _topInset,
               onMoodTap: _openMoodSheet,
               onPhotosTap: _openPhotoGallery,
+              onTextTap: () async {
+                await widget.onOpenJournalSheet();
+                if (mounted) setState(() {});
+              },
             ),
           ),
         ),
@@ -225,7 +165,10 @@ class _BookDiaryPageComposerState extends State<BookDiaryPageComposer> {
           children: [
             _ComposerChip(
               icon: Icons.emoji_emotions_outlined,
-              label: widget.moodEmoji != null ? '무드' : '무드 선택',
+              label: widget.moodEmoji != null
+                  ? '${widget.moodEmoji} ${widget.moodLabel ?? ''}'
+                  : '무드 고르기',
+              selected: widget.moodEmoji != null,
               onTap: _openMoodSheet,
             ),
             _ComposerChip(
@@ -261,20 +204,35 @@ class _ComposerChip extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.selected = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
     return ActionChip(
-      avatar: Icon(icon, size: 16, color: AppTheme.accent),
+      avatar: Icon(
+        icon,
+        size: 16,
+        color: selected ? AppTheme.accent : AppTheme.inkMuted,
+      ),
       label: Text(label),
-      labelStyle: Theme.of(context).textTheme.labelSmall,
-      backgroundColor: Colors.white.withValues(alpha: 0.7),
-      side: BorderSide(color: AppTheme.paperDark.withValues(alpha: 0.9)),
+      labelStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: selected ? AppTheme.accent : null,
+            fontWeight: selected ? FontWeight.w600 : null,
+          ),
+      backgroundColor: selected
+          ? AppTheme.accent.withValues(alpha: 0.1)
+          : Colors.white.withValues(alpha: 0.7),
+      side: BorderSide(
+        color: selected
+            ? AppTheme.accent.withValues(alpha: 0.45)
+            : AppTheme.paperDark.withValues(alpha: 0.9),
+      ),
       onPressed: onTap,
     );
   }

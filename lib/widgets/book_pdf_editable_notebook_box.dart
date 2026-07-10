@@ -17,6 +17,8 @@ class BookPdfEditableNotebookBox extends StatelessWidget {
     this.maxLength = 500,
     this.hintText = '마음에 남는 것을 적어 보세요…',
     this.onChanged,
+    this.readOnly = false,
+    this.onTap,
   });
 
   final TextEditingController controller;
@@ -27,6 +29,8 @@ class BookPdfEditableNotebookBox extends StatelessWidget {
   final int maxLength;
   final String hintText;
   final VoidCallback? onChanged;
+  final bool readOnly;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -59,42 +63,72 @@ class BookPdfEditableNotebookBox extends StatelessWidget {
           BookPdfStyle.pageContentHeight,
         );
 
-        return SizedBox(
+        final hintStyle = style.copyWith(
+          height: null,
+          color: BookPdfStyle.muted.withValues(alpha: 0.65),
+        );
+        final bodyStyle = style.copyWith(height: null, color: BookPdfStyle.body);
+        final strutStyle = StrutStyle(
+          fontSize: style.fontSize,
+          height: style.height,
+          forceStrutHeight: true,
+        );
+
+        Widget child;
+        if (readOnly) {
+          final isEmpty = controller.text.trim().isEmpty;
+          child = Text(
+            isEmpty ? hintText : controller.text,
+            textAlign: align,
+            style: isEmpty ? hintStyle : bodyStyle,
+            strutStyle: strutStyle,
+          );
+        } else {
+          child = TextField(
+            controller: controller,
+            focusNode: focusNode,
+            maxLines: null,
+            maxLength: maxLength,
+            textAlign: align,
+            style: bodyStyle,
+            strutStyle: strutStyle,
+            cursorColor: BookPdfStyle.title,
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+              counterText: '',
+              hintText: hintText,
+              hintStyle: hintStyle,
+            ),
+            onChanged: (_) => onChanged?.call(),
+          );
+        }
+
+        Widget box = SizedBox(
           width: width,
           height: height,
           child: CustomPaint(
             painter: _NotebookBoxPainter(),
             child: Padding(
               padding: const EdgeInsets.all(BookEntryBoxStyle.pad),
-              child: TextField(
-                controller: controller,
-                focusNode: focusNode,
-                maxLines: null,
-                maxLength: maxLength,
-                textAlign: align,
-                style: style.copyWith(height: null, color: BookPdfStyle.body),
-                strutStyle: StrutStyle(
-                  fontSize: style.fontSize,
-                  height: style.height,
-                  forceStrutHeight: true,
-                ),
-                cursorColor: BookPdfStyle.title,
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                  counterText: '',
-                  hintText: hintText,
-                  hintStyle: style.copyWith(
-                    height: null,
-                    color: BookPdfStyle.muted.withValues(alpha: 0.65),
-                  ),
-                ),
-                onChanged: (_) => onChanged?.call(),
-              ),
+              child: child,
             ),
           ),
         );
+
+        if (readOnly && onTap != null) {
+          box = Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(BookEntryBoxStyle.radius),
+              child: box,
+            ),
+          );
+        }
+
+        return box;
       },
     );
   }

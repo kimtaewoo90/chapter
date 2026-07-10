@@ -6,6 +6,10 @@ import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/book_layout/book_pdf_diary_block.dart';
+import '../../core/book_layout/book_pdf_page_planner.dart';
+import '../../core/book_layout/book_preview_entry_mapper.dart';
+import '../../core/constants/app_fonts.dart';
 import '../../core/constants/dev_flags.dart';
 import '../../core/constants/diary_limits.dart';
 import '../../core/constants/moods.dart';
@@ -20,6 +24,7 @@ import '../../providers/app_state.dart';
 import '../../services/analytics_service.dart';
 import '../../services/photo_permission_service.dart';
 import '../../widgets/book_diary_page_composer.dart';
+import '../../widgets/book_diary_page_renderer.dart';
 import '../../widgets/record_save_overlay.dart';
 import 'record_screen_phase_a_body.dart';
 import '../../widgets/dismiss_keyboard.dart';
@@ -579,6 +584,38 @@ class _RecordScreenState extends State<RecordScreen> {
     return (localPaths: <String>[], remoteUrls: <String>[]);
   }
 
+  Widget _buildSaveDiaryPage({
+    required DateTime day,
+    required List<String> displayUris,
+    required AppFontId diaryFontId,
+  }) {
+    final entry = BookPreviewEntryMapper.fromDraft(
+      date: day,
+      note: _noteController.text,
+      photoUris: displayUris,
+      moodEmoji: _moodEmoji,
+      moodLabel: _moodLabel,
+    );
+    final pages = BookPdfPreviewPlanner.planSingleEntry(
+      entry: entry,
+      diaryFontId: diaryFontId,
+      centerOnPage: false,
+    );
+    final blocks = pages.isNotEmpty
+        ? pages.first.diaryBlocks!
+        : <BookDiaryBlock>[BookDiaryHeaderBlock(entry)];
+    final topInset = pages.isNotEmpty ? pages.first.topInset : 0.0;
+
+    return BookPdfPageFrame(
+      horizontalPadding: 0,
+      child: BookPdfDiaryPageContent(
+        blocks: blocks,
+        topInset: topInset,
+        diaryFontId: diaryFontId,
+      ),
+    );
+  }
+
   Future<void> _save() async {
     DismissKeyboard.unfocus(context);
 
@@ -606,7 +643,7 @@ class _RecordScreenState extends State<RecordScreen> {
           );
       if (mounted) {
         setState(() => _saveOverlayComplete = true);
-        await Future.delayed(const Duration(milliseconds: 650));
+        await Future.delayed(const Duration(milliseconds: 3500));
       }
       if (!mounted) return;
       context.read<AnalyticsService>().logDiarySave(
@@ -734,7 +771,7 @@ class _RecordScreenState extends State<RecordScreen> {
           child: kRecordBookPageComposer
               ? ListView(
                   keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                   children: [
                     BookDiaryPageComposer(
                       date: day,
@@ -771,6 +808,7 @@ class _RecordScreenState extends State<RecordScreen> {
                         reorderedNewFiles: reorderedNew,
                         entry: entry,
                       ),
+                      onOpenJournalSheet: _openJournalSheet,
                     ),
                     if (!isToday && entry?.weatherDisplayLine != null) ...[
                       const SizedBox(height: 8),
@@ -840,6 +878,12 @@ class _RecordScreenState extends State<RecordScreen> {
                 step: _saveStep,
                 complete: _saveOverlayComplete,
                 bookProgressPercent: (appState.bookProgress * 100).round(),
+                diaryPage: _buildSaveDiaryPage(
+                  day: day,
+                  displayUris: displayUris,
+                  diaryFontId: appState.diaryFontId,
+                ),
+                coverTitle: '나의책',
               ),
             ),
         ],

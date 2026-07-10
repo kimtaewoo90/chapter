@@ -5,6 +5,7 @@ import '../core/book_layout/book_pdf_style.dart';
 import '../core/constants/dev_flags.dart';
 import '../core/theme/app_theme.dart';
 import '../models/record_save_step.dart';
+import 'record_save_book_animation.dart';
 import 'onboarding_book_lottie.dart';
 
 /// 저장 중 — 책 테마 + 단계별 메시지 (스피너 대신)
@@ -14,12 +15,16 @@ class RecordSaveOverlay extends StatelessWidget {
     required this.step,
     this.complete = false,
     this.bookProgressPercent,
+    this.diaryPage,
+    this.coverTitle = '나의책',
   });
 
   final RecordSaveStep step;
   final bool complete;
-  /// Phase C — 저장 후 책 진행률 (0~100)
   final int? bookProgressPercent;
+  /// 저장된 실제 일기 페이지 (`BookPdfPageFrame` 등)
+  final Widget? diaryPage;
+  final String coverTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -31,19 +36,25 @@ class RecordSaveOverlay extends StatelessWidget {
       child: SafeArea(
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox(
-                  width: useV2 ? 160 : 140,
-                  height: useV2 ? 110 : 100,
+                  width: 340,
+                  height: complete && diaryPage != null ? 340 : (useV2 ? 160 : 140),
                   child: complete
-                      ? (useV2
-                          ? _PageAddedAnimationV2(
+                      ? (diaryPage != null
+                          ? RecordSaveBookAnimation(
+                              diaryPage: diaryPage!,
                               bookProgressPercent: bookProgressPercent,
+                              coverTitle: coverTitle,
                             )
-                          : const _PageAddedAnimation())
+                          : (useV2
+                              ? _PageAddedAnimationV2(
+                                  bookProgressPercent: bookProgressPercent,
+                                )
+                              : const _PageAddedAnimation()))
                       : OnboardingBookLottie()
                           .animate(onPlay: (c) => c.repeat(reverse: true))
                           .scale(

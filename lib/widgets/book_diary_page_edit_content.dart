@@ -6,6 +6,7 @@ import '../core/book_layout/book_pdf_layout_metrics.dart';
 import '../core/book_layout/book_pdf_style.dart';
 import '../core/book_layout/book_preview_entry_mapper.dart';
 import '../core/constants/app_fonts.dart';
+import '../core/theme/app_theme.dart';
 import 'book_diary_page_renderer.dart';
 import 'book_pdf_editable_notebook_box.dart';
 
@@ -19,6 +20,7 @@ class BookDiaryPageEditContent extends StatelessWidget {
     required this.diaryFontId,
     this.onMoodTap,
     this.onPhotosTap,
+    this.onTextTap,
     this.topInset = 0,
     this.showTextField = true,
   });
@@ -29,6 +31,7 @@ class BookDiaryPageEditContent extends StatelessWidget {
   final AppFontId diaryFontId;
   final VoidCallback? onMoodTap;
   final VoidCallback? onPhotosTap;
+  final VoidCallback? onTextTap;
   final double topInset;
   final bool showTextField;
 
@@ -76,6 +79,8 @@ class BookDiaryPageEditContent extends StatelessWidget {
                           compact: compact,
                         ),
                         diaryFontId: diaryFontId,
+                        readOnly: onTextTap != null,
+                        onTap: onTextTap,
                       ),
                     ),
                 ],
@@ -112,24 +117,16 @@ class BookPdfEditableEntryHeader extends StatelessWidget {
 
     Widget moodWidget;
     if (moodLabel != null) {
-      moodWidget = Text(
-        moodLabel,
-        style: diaryFontStyle(
-          diaryFontId,
-          fontSize: BookPdfStyle.moodSize,
-          height: 1.2,
-          color: BookPdfStyle.muted,
-        ),
+      moodWidget = _MoodHeaderPill(
+        emoji: entry.moodEmoji ?? '',
+        label: moodLabel,
+        selected: true,
       );
     } else {
-      moodWidget = Text(
-        '+ 무드',
-        style: diaryFontStyle(
-          diaryFontId,
-          fontSize: BookPdfStyle.moodSize,
-          height: 1.2,
-          color: BookPdfStyle.muted.withValues(alpha: 0.7),
-        ),
+      moodWidget = const _MoodHeaderPill(
+        emoji: '＋',
+        label: '무드',
+        selected: false,
       );
     }
 
@@ -156,11 +153,8 @@ class BookPdfEditableEntryHeader extends StatelessWidget {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: onMoodTap,
-                  borderRadius: BorderRadius.circular(6),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    child: moodWidget,
-                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  child: moodWidget,
                 ),
               ),
             ],
@@ -169,6 +163,59 @@ class BookPdfEditableEntryHeader extends StatelessWidget {
         Container(height: 0.5, color: BookPdfStyle.line),
         const SizedBox(height: BookPdfStyle.headerBottomGap),
       ],
+    );
+  }
+}
+
+class _MoodHeaderPill extends StatelessWidget {
+  const _MoodHeaderPill({
+    required this.emoji,
+    required this.label,
+    required this.selected,
+  });
+
+  final String emoji;
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: selected
+            ? AppTheme.accent.withValues(alpha: 0.1)
+            : Colors.white.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: selected
+              ? AppTheme.accent.withValues(alpha: 0.4)
+              : BookPdfStyle.muted.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            emoji,
+            style: TextStyle(
+              fontSize: selected ? 14 : 12,
+              height: 1.1,
+              color: selected ? null : BookPdfStyle.muted,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: BookPdfStyle.moodSize,
+              height: 1.1,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              color: selected ? AppTheme.accent : BookPdfStyle.muted,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
