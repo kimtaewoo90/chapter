@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../constants/app_fonts.dart';
 import 'book_layout_types.dart';
+import 'book_pdf_body_style.dart';
 import 'book_pdf_diary_block.dart';
 import 'book_pdf_photo_meta.dart';
 import 'book_photo_style.dart';
@@ -47,9 +48,15 @@ class BookPdfLayoutMetrics {
 
   static double photoBlockHeight(BookDiaryEntry entry) {
     if (entry.photoCount == 0) return 0;
-    return photoCollageHeight(entry) +
-        BookEntryBoxStyle.pad * 2 +
-        BookEntryBoxStyle.sectionGap;
+    return photoCollageHeight(entry) + BookEntryBoxStyle.sectionGap;
+  }
+
+  static double _lineStep(BookLayoutPlan plan) {
+    final fontSize = plan.textStyle == BookTextStyle.caption
+        ? BookPdfStyle.captionSize
+        : BookPdfStyle.bodySize;
+    final lineHeight = plan.textStyle == BookTextStyle.fullStyle ? 1.55 : 1.35;
+    return fontSize * lineHeight + BookEntryBoxStyle.lineGap;
   }
 
   static TextStyle _metricsTextStyle(BookLayoutPlan plan) {
@@ -80,11 +87,13 @@ class BookPdfLayoutMetrics {
   static StrutStyle strutForPlan(
     BookLayoutPlan plan, {
     AppFontId diaryFontId = kDefaultDiaryFontId,
+    BookEntryBodyStyle bodyStyle = BookEntryBodyStyles.previewDefault,
   }) {
     final style = _metricsTextStyle(plan);
     return StrutStyle(
       fontSize: style.fontSize,
       height: style.height,
+      leadingDistribution: TextLeadingDistribution.even,
       forceStrutHeight: true,
     );
   }
@@ -101,19 +110,30 @@ class BookPdfLayoutMetrics {
     required double maxWidth,
     required int minLines,
     AppFontId diaryFontId = kDefaultDiaryFontId,
+    BookEntryBodyStyle bodyStyle = BookEntryBodyStyles.previewDefault,
   }) {
     if (text.isEmpty) return 0;
 
     final style = _metricsTextStyle(plan);
-    final innerWidth = maxWidth - BookEntryBoxStyle.pad * 2;
+    final centerAlign = plan.textStyle == BookTextStyle.caption;
+    final innerWidth = BookEntryBoxStyle.textInnerWidth(
+      maxWidth,
+      bodyStyle: bodyStyle,
+      centerAlign: centerAlign,
+    );
     final painter = TextPainter(
-      text: TextSpan(text: text, style: style),
+      text: TextSpan(text: text, style: style.copyWith(height: null)),
       textDirection: TextDirection.ltr,
-      strutStyle: strutForPlan(plan, diaryFontId: diaryFontId),
+      strutStyle: strutForPlan(
+        plan,
+        diaryFontId: diaryFontId,
+        bodyStyle: bodyStyle,
+      ),
     )..layout(maxWidth: innerWidth);
 
-    final minHeight = minLines * BookEntryBoxStyle.ruleSpacing + BookEntryBoxStyle.pad * 2;
-    final contentHeight = painter.size.height + BookEntryBoxStyle.pad * 2 + 4;
+    final lineStep = _lineStep(plan);
+    final minHeight = minLines * lineStep + BookEntryBoxStyle.pad * 2;
+    final contentHeight = painter.size.height + BookEntryBoxStyle.pad * 2 + 2;
     final height = contentHeight > minHeight ? contentHeight : minHeight;
     return height.ceilToDouble() + 1;
   }
@@ -123,6 +143,7 @@ class BookPdfLayoutMetrics {
     BookLayoutPlan plan, {
     required int minLines,
     AppFontId diaryFontId = kDefaultDiaryFontId,
+    BookEntryBodyStyle bodyStyle = BookEntryBodyStyles.previewDefault,
   }) {
     return measureTextHeight(
           text,
@@ -130,6 +151,7 @@ class BookPdfLayoutMetrics {
           maxWidth: BookPdfPageSpec.contentWidth,
           minLines: minLines,
           diaryFontId: diaryFontId,
+          bodyStyle: bodyStyle,
         ) +
         BookEntryBoxStyle.boxGap;
   }

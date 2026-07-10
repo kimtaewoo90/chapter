@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'book_layout_types.dart';
+import 'book_pdf_body_style.dart';
 
 /// chapter_admin `pdf/generator.ts` · `pdf/entryStyle.ts` 상수
 class BookPdfStyle {
@@ -32,19 +33,49 @@ class BookPdfStyle {
 class BookEntryBoxStyle {
   BookEntryBoxStyle._();
 
-  static const radius = 8.0;
+  static const radius = 6.0;
   static const pad = 12.0;
+  static const padLeft = 22.0;
   static const border = Color(0xFFDDD6CA);
   static const photoBg = Colors.white;
-  static const noteBg = Color(0xFFFFFEF8);
+  static const noteBg = Color(0xFFFAF7F1);
   static const ruleColor = Color(0xFFE8E2D6);
-  static const marginLine = Color(0xFFF0D4D4);
-  static const marginLineInset = 22.0;
+  static const railColor = Color(0xFF8B7355);
+  static const railWidth = 2.0;
+  static const railInset = 6.0;
+  static const dotSpacing = 16.0;
+  static const dotRadius = 0.65;
+  static const dotColor = Color(0xFFCBC2B4);
+  static const tapeColor = Color(0xFFF3E4B8);
+  static const tapeShadow = Color(0xFFD9C99A);
+  static const tapeFiber = Color(0xFFE8D8A8);
+  static const lineGap = 7.0;
   static const ruleSpacing = 20.0;
   static const sectionGap = 10.0;
   static const boxGap = 14.0;
 
-  static double photoInnerWidth(double outerWidth) => outerWidth - pad * 2;
+  static double photoInnerWidth(double outerWidth) => outerWidth;
+
+  static double textInnerWidth(
+    double outerWidth, {
+    required BookEntryBodyStyle bodyStyle,
+    required bool centerAlign,
+  }) {
+    if (bodyStyle == BookEntryBodyStyle.marginRail && !centerAlign) {
+      return outerWidth - padLeft - pad;
+    }
+    return outerWidth - pad * 2;
+  }
+
+  static double textPadLeft({
+    required BookEntryBodyStyle bodyStyle,
+    required bool centerAlign,
+  }) {
+    if (bodyStyle == BookEntryBodyStyle.marginRail && !centerAlign) {
+      return padLeft;
+    }
+    return pad;
+  }
 }
 
 class BookCalendarStyle {
