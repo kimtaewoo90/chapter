@@ -135,15 +135,16 @@ class _BookDiaryPageComposerState extends State<BookDiaryPageComposer> {
       children: [
         Text(
           '책에 담기는 한 페이지',
-          style: textTheme.labelSmall?.copyWith(
+          style: textTheme.labelMedium?.copyWith(
             color: AppTheme.inkMuted,
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         AspectRatio(
           aspectRatio: BookPdfPageSpec.width / BookPdfPageSpec.height,
           child: BookPdfPageFrame(
+            horizontalPadding: 0,
             child: BookDiaryPageEditContent(
               entry: _draft,
               noteController: widget.noteController,
@@ -158,10 +159,10 @@ class _BookDiaryPageComposerState extends State<BookDiaryPageComposer> {
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
         Wrap(
-          spacing: 8,
-          runSpacing: 6,
+          spacing: 10,
+          runSpacing: 8,
           children: [
             _ComposerChip(
               icon: Icons.emoji_emotions_outlined,
@@ -217,14 +218,15 @@ class _ComposerChip extends StatelessWidget {
     return ActionChip(
       avatar: Icon(
         icon,
-        size: 16,
+        size: 20,
         color: selected ? AppTheme.accent : AppTheme.inkMuted,
       ),
       label: Text(label),
-      labelStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: selected ? AppTheme.accent : null,
-            fontWeight: selected ? FontWeight.w600 : null,
+      labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: selected ? AppTheme.accent : AppTheme.ink,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
           ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       backgroundColor: selected
           ? AppTheme.accent.withValues(alpha: 0.1)
           : Colors.white.withValues(alpha: 0.7),

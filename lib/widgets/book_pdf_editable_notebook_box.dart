@@ -34,10 +34,17 @@ class BookPdfEditableNotebookBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = BookPdfLayoutMetrics.textStyleForPlan(
+    final baseStyle = BookPdfLayoutMetrics.textStyleForPlan(
       plan,
       diaryFontId: diaryFontId,
     );
+    // 책 페이지 미리보기(클릭 전)만 글씨를 키움 — PDF 실측은 그대로
+    const previewScale = 1.55;
+    final style = readOnly
+        ? baseStyle.copyWith(
+            fontSize: (baseStyle.fontSize ?? BookPdfStyle.bodySize) * previewScale,
+          )
+        : baseStyle;
     final align = plan.textStyle == BookTextStyle.caption
         ? TextAlign.center
         : TextAlign.left;
@@ -46,20 +53,22 @@ class BookPdfEditableNotebookBox extends StatelessWidget {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final text = controller.text.isEmpty ? hintText : controller.text;
-        final height = BookPdfLayoutMetrics.measureTextHeight(
+        final measured = BookPdfLayoutMetrics.measureTextHeight(
           text,
           plan,
           maxWidth: width,
           minLines: minLines,
           diaryFontId: diaryFontId,
-        ).clamp(
-          BookPdfLayoutMetrics.measureTextHeight(
-            '가',
-            plan,
-            maxWidth: width,
-            minLines: minLines,
-            diaryFontId: diaryFontId,
-          ),
+        );
+        final minMeasured = BookPdfLayoutMetrics.measureTextHeight(
+          '가',
+          plan,
+          maxWidth: width,
+          minLines: minLines,
+          diaryFontId: diaryFontId,
+        );
+        final height = (readOnly ? measured * previewScale : measured).clamp(
+          readOnly ? minMeasured * previewScale : minMeasured,
           BookPdfStyle.pageContentHeight,
         );
 

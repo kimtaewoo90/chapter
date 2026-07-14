@@ -643,7 +643,7 @@ class _RecordScreenState extends State<RecordScreen> {
           );
       if (mounted) {
         setState(() => _saveOverlayComplete = true);
-        await Future.delayed(const Duration(milliseconds: 3500));
+        await Future.delayed(const Duration(milliseconds: 4300));
       }
       if (!mounted) return;
       context.read<AnalyticsService>().logDiarySave(
@@ -771,7 +771,7 @@ class _RecordScreenState extends State<RecordScreen> {
           child: kRecordBookPageComposer
               ? ListView(
                   keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                   children: [
                     BookDiaryPageComposer(
                       date: day,

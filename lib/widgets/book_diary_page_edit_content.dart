@@ -142,7 +142,7 @@ class BookPdfEditableEntryHeader extends StatelessWidget {
                   dateLabel,
                   style: diaryFontStyle(
                     diaryFontId,
-                    fontSize: BookPdfStyle.dateSize,
+                    fontSize: 15,
                     height: 1.2,
                     color: BookPdfStyle.title,
                     fontWeight: FontWeight.w600,
@@ -181,12 +181,12 @@ class _MoodHeaderPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: selected
             ? AppTheme.accent.withValues(alpha: 0.1)
             : Colors.white.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: selected
               ? AppTheme.accent.withValues(alpha: 0.4)
@@ -199,16 +199,16 @@ class _MoodHeaderPill extends StatelessWidget {
           Text(
             emoji,
             style: TextStyle(
-              fontSize: selected ? 14 : 12,
+              fontSize: selected ? 18 : 16,
               height: 1.1,
               color: selected ? null : BookPdfStyle.muted,
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
           Text(
             label,
             style: TextStyle(
-              fontSize: BookPdfStyle.moodSize,
+              fontSize: 13,
               height: 1.1,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
               color: selected ? AppTheme.accent : BookPdfStyle.muted,
@@ -249,10 +249,10 @@ class _TappablePhotoSection extends StatelessWidget {
                   border: Border.all(color: BookEntryBoxStyle.border),
                 ),
                 child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   child: Text(
                     '탭해서 편집',
-                    style: TextStyle(fontSize: 9, color: BookPdfStyle.muted),
+                    style: TextStyle(fontSize: 11, color: BookPdfStyle.muted),
                   ),
                 ),
               ),
@@ -279,9 +279,9 @@ class _EmptyPhotoSlot extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(BookEntryBoxStyle.radius),
-          child: Container(
+            child: Container(
             width: BookPdfPageSpec.contentWidth,
-            height: 88,
+            height: 110,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(BookEntryBoxStyle.radius),
@@ -290,7 +290,7 @@ class _EmptyPhotoSlot extends StatelessWidget {
             child: Text(
               '+ 사진 붙이기',
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 15,
                 color: BookPdfStyle.muted.withValues(alpha: 0.85),
                 fontWeight: FontWeight.w500,
               ),

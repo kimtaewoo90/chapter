@@ -108,7 +108,7 @@ class _JournalWriteSheetBodyState extends State<_JournalWriteSheetBody> {
                   controller: widget.controller,
                   focusNode: _focusNode,
                   embedded: true,
-                  minLines: 22,
+                  minLines: 18,
                   maxLength: 500,
                   hintText: '마음에 남는 것을 적어 보세요…',
                 ),

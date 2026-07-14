@@ -395,8 +395,8 @@ class _MoodChip extends StatelessWidget {
     this.highlightAi = false,
   });
 
-  static const double kWidth = 68;
-  static const double kHeight = 72;
+  static const double kWidth = 88;
+  static const double kHeight = 94;
 
   final MoodOption mood;
   final bool isSelected;
@@ -446,15 +446,15 @@ class _MoodChip extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(mood.emoji, style: const TextStyle(fontSize: 26, height: 1.1)),
-              const SizedBox(height: 4),
+              Text(mood.emoji, style: const TextStyle(fontSize: 32, height: 1.1)),
+              const SizedBox(height: 6),
               Text(
                 mood.label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 12,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   color: isSelected ? AppTheme.accent : AppTheme.inkMuted,
                   height: 1.1,
@@ -496,14 +496,14 @@ class _AddMoodChip extends StatelessWidget {
             children: [
               Icon(
                 Icons.add_rounded,
-                size: 24,
+                size: 28,
                 color: AppTheme.accent.withValues(alpha: 0.9),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 '내 무드',
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 12,
                   color: AppTheme.accent.withValues(alpha: 0.9),
                   fontWeight: FontWeight.w600,
                 ),

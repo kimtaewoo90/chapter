@@ -65,7 +65,7 @@ class PaperJournalField extends StatelessWidget {
               ),
             ),
           Padding(
-            padding: EdgeInsets.fromLTRB(embedded ? 4 : 26, embedded ? 8 : 16, embedded ? 0 : 16, embedded ? 8 : 16),
+            padding: EdgeInsets.fromLTRB(embedded ? 8 : 26, embedded ? 12 : 16, embedded ? 4 : 16, embedded ? 12 : 16),
             child: TextField(
               controller: controller,
               focusNode: focusNode,
